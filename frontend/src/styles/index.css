@@ -1,0 +1,363 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root,
+  :root[data-theme="premium-hybrid"],
+  .theme-root[data-theme="premium-hybrid"] {
+    --color-background: 15 17 21;
+    --color-surface: 23 26 33;
+    --color-surface-strong: 29 34 45;
+    --color-surface-raised: 34 39 51;
+    --color-text-primary: 250 250 250;
+    --color-text-secondary: 212 212 216;
+    --color-text-muted: 161 161 170;
+    --color-border: 255 255 255 / 0.1;
+    --color-xp: 212 175 55;
+    --color-success: 16 185 129;
+    --color-rare: 139 92 246;
+    --color-epic: 236 72 153;
+    --color-chart-grid: 255 255 255 / 0.06;
+    --panel-background: linear-gradient(180deg, rgb(25 28 36 / 0.94), rgb(17 20 27 / 0.94));
+    --app-background:
+      radial-gradient(circle at 18% 0%, rgb(212 175 55 / 0.13), transparent 30%),
+      radial-gradient(circle at 74% 8%, rgb(139 92 246 / 0.12), transparent 26%),
+      linear-gradient(180deg, rgb(15 17 21), rgb(18 21 28));
+    --shadow-premium: 0 24px 80px rgb(0 0 0 / 0.34);
+  }
+
+  :root[data-theme="minimal-dark"],
+  .theme-root[data-theme="minimal-dark"] {
+    --color-background: 10 11 14;
+    --color-surface: 18 20 25;
+    --color-surface-strong: 25 28 34;
+    --color-surface-raised: 31 34 41;
+    --color-text-primary: 250 250 250;
+    --color-text-secondary: 214 214 220;
+    --color-text-muted: 146 151 162;
+    --color-border: 255 255 255 / 0.09;
+    --color-xp: 222 176 62;
+    --color-success: 34 197 94;
+    --color-rare: 96 165 250;
+    --color-epic: 168 85 247;
+    --color-chart-grid: 255 255 255 / 0.055;
+    --panel-background: linear-gradient(180deg, rgb(18 20 25 / 0.96), rgb(12 14 18 / 0.96));
+    --app-background:
+      radial-gradient(circle at 30% 0%, rgb(222 176 62 / 0.11), transparent 32%),
+      linear-gradient(180deg, rgb(10 11 14), rgb(13 15 19));
+    --shadow-premium: 0 24px 74px rgb(0 0 0 / 0.38);
+  }
+
+  :root[data-theme="cyberpunk"],
+  .theme-root[data-theme="cyberpunk"] {
+    --color-background: 5 8 18;
+    --color-surface: 9 14 31;
+    --color-surface-strong: 13 20 43;
+    --color-surface-raised: 17 26 55;
+    --color-text-primary: 239 249 255;
+    --color-text-secondary: 186 230 253;
+    --color-text-muted: 148 163 184;
+    --color-border: 34 211 238 / 0.22;
+    --color-xp: 34 211 238;
+    --color-success: 45 212 191;
+    --color-rare: 168 85 247;
+    --color-epic: 244 114 182;
+    --color-chart-grid: 34 211 238 / 0.1;
+    --panel-background:
+      linear-gradient(180deg, rgb(9 14 31 / 0.9), rgb(3 7 18 / 0.9)),
+      linear-gradient(90deg, rgb(34 211 238 / 0.1), rgb(168 85 247 / 0.08));
+    --app-background:
+      radial-gradient(circle at 18% 0%, rgb(34 211 238 / 0.18), transparent 30%),
+      radial-gradient(circle at 82% 12%, rgb(236 72 153 / 0.18), transparent 26%),
+      linear-gradient(180deg, rgb(5 8 18), rgb(10 7 24));
+    --shadow-premium: 0 0 42px rgb(34 211 238 / 0.1), 0 24px 80px rgb(0 0 0 / 0.44);
+  }
+
+  :root[data-theme="living-world"],
+  .theme-root[data-theme="living-world"] {
+    --color-background: 237 240 221;
+    --color-surface: 251 248 231;
+    --color-surface-strong: 230 235 207;
+    --color-surface-raised: 255 252 237;
+    --color-text-primary: 32 45 35;
+    --color-text-secondary: 67 88 66;
+    --color-text-muted: 108 121 96;
+    --color-border: 73 96 64 / 0.18;
+    --color-xp: 103 128 54;
+    --color-success: 47 128 82;
+    --color-rare: 92 111 72;
+    --color-epic: 167 103 69;
+    --color-chart-grid: 73 96 64 / 0.12;
+    --panel-background: linear-gradient(180deg, rgb(255 252 237 / 0.92), rgb(239 242 218 / 0.92));
+    --app-background:
+      radial-gradient(circle at 18% 0%, rgb(47 128 82 / 0.16), transparent 30%),
+      radial-gradient(circle at 78% 10%, rgb(167 103 69 / 0.1), transparent 28%),
+      linear-gradient(180deg, rgb(237 240 221), rgb(222 231 202));
+    --shadow-premium: 0 24px 70px rgb(66 86 59 / 0.18);
+  }
+
+  :root[data-theme="adventurers-journal"],
+  .theme-root[data-theme="adventurers-journal"] {
+    --color-background: 44 31 20;
+    --color-surface: 229 207 164;
+    --color-surface-strong: 197 160 103;
+    --color-surface-raised: 244 224 181;
+    --color-text-primary: 49 32 18;
+    --color-text-secondary: 89 60 35;
+    --color-text-muted: 125 91 57;
+    --color-border: 96 60 34 / 0.26;
+    --color-xp: 149 91 31;
+    --color-success: 60 112 74;
+    --color-rare: 104 77 142;
+    --color-epic: 159 69 91;
+    --color-chart-grid: 96 60 34 / 0.16;
+    --panel-background: linear-gradient(180deg, rgb(244 224 181 / 0.94), rgb(225 199 151 / 0.94));
+    --app-background:
+      radial-gradient(circle at 20% 0%, rgb(229 207 164 / 0.2), transparent 28%),
+      linear-gradient(180deg, rgb(44 31 20), rgb(66 43 25));
+    --shadow-premium: 0 22px 70px rgb(31 21 13 / 0.32);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: rgb(var(--color-background));
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0;
+    color: rgb(var(--color-text-primary));
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .theme-root {
+    color: rgb(var(--color-text-primary));
+    transition: background-color 220ms ease, color 220ms ease;
+  }
+
+  .app-background {
+    background: var(--app-background);
+  }
+
+  .panel {
+    @apply rounded-lg border shadow-premium backdrop-blur-xl;
+    background: var(--panel-background);
+    border-color: rgb(var(--color-border));
+  }
+
+  .section-heading {
+    @apply flex items-start justify-between gap-3;
+  }
+
+  .section-heading h2 {
+    @apply text-base font-semibold;
+    color: rgb(var(--color-text-primary));
+  }
+
+  .section-heading span {
+    @apply rounded-md border px-2 py-1 text-xs;
+    background: rgb(var(--color-surface-raised) / 0.34);
+    border-color: rgb(var(--color-border));
+    color: rgb(var(--color-text-muted));
+  }
+
+  .eyebrow {
+    @apply mb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-xp;
+  }
+
+  .icon-button {
+    @apply grid h-10 w-10 place-items-center rounded-lg border transition hover:border-xp/40 hover:text-xp;
+    background: rgb(var(--color-surface-raised) / 0.3);
+    border-color: rgb(var(--color-border));
+    color: rgb(var(--color-text-muted));
+  }
+
+  .field-label {
+    @apply block text-sm font-medium;
+    color: rgb(var(--color-text-secondary));
+  }
+
+  .field-control {
+    @apply mt-2 w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-xp/60;
+    background: rgb(var(--color-surface-strong) / 0.62);
+    border-color: rgb(var(--color-border));
+    color: rgb(var(--color-text-primary));
+  }
+
+  .primary-button {
+    @apply w-full rounded-lg border border-xp/40 bg-gradient-to-r from-xp to-[#F0C85A] px-4 py-2.5 text-sm font-semibold text-[#141109] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .theme-switcher {
+    @apply grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:w-auto xl:grid-cols-5;
+  }
+
+  .theme-option {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition;
+    background: rgb(var(--color-surface-raised) / 0.28);
+    border-color: rgb(var(--color-border));
+    color: rgb(var(--color-text-muted));
+  }
+
+  .theme-option:hover,
+  .theme-option-active {
+    border-color: rgb(var(--color-xp) / 0.55);
+    color: rgb(var(--color-xp));
+    background: rgb(var(--color-xp) / 0.1);
+  }
+
+  .range-control {
+    @apply mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between;
+  }
+
+  .range-tabs {
+    @apply inline-flex w-full flex-wrap gap-2 rounded-lg border p-1 xl:w-auto;
+    background: rgb(var(--color-surface-strong) / 0.42);
+    border-color: rgb(var(--color-border));
+  }
+
+  .range-tab {
+    @apply min-h-9 flex-1 rounded-md px-3 text-sm font-medium transition xl:flex-none;
+    color: rgb(var(--color-text-muted));
+  }
+
+  .range-tab:hover,
+  .range-tab-active {
+    color: rgb(var(--color-xp));
+    background: rgb(var(--color-xp) / 0.11);
+  }
+
+  .custom-range-fields {
+    @apply flex flex-wrap items-end gap-2;
+  }
+
+  .custom-range-fields label {
+    @apply text-xs font-medium;
+    color: rgb(var(--color-text-muted));
+  }
+
+  .custom-range-fields span {
+    @apply mb-1 block;
+  }
+
+  .custom-range-fields input,
+  .custom-range-fields button {
+    @apply min-h-9 rounded-lg border px-3 text-sm outline-none transition;
+    background: rgb(var(--color-surface-strong) / 0.58);
+    border-color: rgb(var(--color-border));
+    color: rgb(var(--color-text-primary));
+  }
+
+  .custom-range-fields button {
+    color: rgb(var(--color-xp));
+  }
+
+  .reward-float {
+    @apply pointer-events-none absolute right-3 top-1 z-10 rounded-lg border px-3 py-1 text-sm font-semibold;
+    animation: reward-rise 1200ms ease both;
+    background: rgb(var(--color-xp) / 0.12);
+    border-color: rgb(var(--color-xp) / 0.36);
+    color: rgb(var(--color-xp));
+  }
+
+  .habit-orb {
+    @apply grid h-8 w-8 place-items-center rounded-full border transition;
+    background: rgb(var(--color-surface-raised) / 0.35);
+    border-color: rgb(var(--color-border));
+    color: rgb(var(--color-text-muted));
+  }
+
+  .habit-orb-complete {
+    background: rgb(var(--color-success) / 0.18);
+    border-color: rgb(var(--color-success) / 0.48);
+    color: rgb(var(--color-success));
+    box-shadow: 0 0 24px rgb(var(--color-success) / 0.13);
+  }
+
+  .quest-row {
+    position: relative;
+  }
+
+  .quest-row:hover {
+    transform: translateY(-1px);
+  }
+
+  .challenge-panel {
+    overflow: hidden;
+  }
+
+  .theme-root .text-zinc-50,
+  .theme-root .text-zinc-100 {
+    color: rgb(var(--color-text-primary));
+  }
+
+  .theme-root .text-zinc-300,
+  .theme-root .text-zinc-400 {
+    color: rgb(var(--color-text-secondary));
+  }
+
+  .theme-root .text-zinc-500,
+  .theme-root .text-zinc-600,
+  .theme-root .text-zinc-700 {
+    color: rgb(var(--color-text-muted));
+  }
+
+  .theme-root .bg-zinc-900 {
+    background-color: rgb(var(--color-surface-strong));
+  }
+
+  .theme-root .bg-zinc-700 {
+    background-color: rgb(var(--color-text-muted) / 0.5);
+  }
+
+  .theme-root [class*="border-white/10"],
+  .theme-root [class*="border-white/20"] {
+    border-color: rgb(var(--color-border)) !important;
+  }
+
+  .theme-root [class*="bg-white/[0.03]"],
+  .theme-root [class*="bg-white/[0.035]"],
+  .theme-root [class*="bg-white/[0.04]"],
+  .theme-root [class*="bg-white/5"],
+  .theme-root [class*="bg-black/20"],
+  .theme-root [class*="bg-black/30"] {
+    background-color: rgb(var(--color-surface-raised) / 0.34) !important;
+  }
+
+  .theme-root[data-theme="cyberpunk"] .panel {
+    box-shadow: var(--shadow-premium);
+  }
+
+  .theme-root[data-theme="adventurers-journal"] .panel {
+    border-width: 1px;
+  }
+
+  @keyframes reward-rise {
+    0% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.96);
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-24px) scale(1);
+    }
+  }
+}

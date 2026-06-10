@@ -57,7 +57,7 @@ Default local database settings:
 ```env
 POSTGRES_DB=life_rpg_tracker
 POSTGRES_USER=life_rpg
-POSTGRES_PASSWORD=life_rpg_dev
+POSTGRES_PASSWORD=<set-a-local-password>
 POSTGRES_HOST=127.0.0.1
 POSTGRES_PORT=5432
 ```
@@ -65,7 +65,7 @@ POSTGRES_PORT=5432
 Alternatively, set:
 
 ```env
-DATABASE_URL=postgres://life_rpg:life_rpg_dev@127.0.0.1:5432/life_rpg_tracker
+DATABASE_URL=postgres://life_rpg:<set-a-local-password>@127.0.0.1:5432/life_rpg_tracker
 ```
 
 The app intentionally has no SQLite fallback.
@@ -165,6 +165,32 @@ http://127.0.0.1:8000/
 ```
 
 Django serves the built React app from `frontend/dist`.
+
+## Docker
+
+Build and run the Django image with PostgreSQL:
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000/
+```
+
+The Compose setup builds the React app into the image, starts PostgreSQL, runs
+`python manage.py migrate`, and serves Django on port `8000`.
+
+`docker compose` reads the local `.env` file automatically. Set
+`POSTGRES_PASSWORD` there before starting the stack; `.env` is ignored by Git.
+
+Seed starter data inside the running app container:
+
+```bash
+docker compose exec app python manage.py seed_life_rpg
+```
 
 ## Main Local URLs
 

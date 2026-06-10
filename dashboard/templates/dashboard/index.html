@@ -1,0 +1,455 @@
+{% load static %}
+<!doctype html>
+<html lang="en" data-theme="premium-hybrid">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Life RPG Tracker</title>
+    <script>
+      (function () {
+        const theme = localStorage.getItem("life-rpg-dashboard-theme") || "premium-hybrid";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{% static 'dashboard/themes.css' %}">
+  </head>
+  <body class="theme-shell legendary-shell" data-dashboard-date="{{ selected_range.start_date|date:'Y-m-d' }}">
+    <div class="legendary-feedback-layer" data-feedback-layer aria-hidden="true"></div>
+    <aside class="legendary-sidebar" aria-label="Primary navigation">
+      <div class="legendary-logo">
+        <span class="legendary-logo-mark">LR</span>
+        <span>
+          <strong>LIFE RPG</strong>
+          <small>Forge Your Legend</small>
+        </span>
+      </div>
+
+      <nav class="legendary-nav">
+        <a class="legendary-nav-item is-active" href="#"><span>D</span>Dashboard</a>
+        <a class="legendary-nav-item" href="#"><span>Q</span>Quests</a>
+        <a class="legendary-nav-item" href="#"><span>H</span>Habits</a>
+        <a class="legendary-nav-item" href="#"><span>S</span>Skills</a>
+        <a class="legendary-nav-item" href="#"><span>G</span>Goals</a>
+        <a class="legendary-nav-item" href="#"><span>A</span>Achievements</a>
+        <a class="legendary-nav-item" href="#"><span>J</span>Journal</a>
+        <a class="legendary-nav-item" href="#"><span>I</span>Inventory</a>
+        <a class="legendary-nav-item" href="#"><span>C</span>Calendar</a>
+        <a class="legendary-nav-item" href="#"><span>SE</span>Settings</a>
+      </nav>
+
+      <div class="legendary-profile">
+        <span class="legendary-avatar legendary-avatar-small">{{ hero.name|first|upper }}</span>
+        <span>
+          <strong>{{ hero.name }}</strong>
+          <small>Level {{ hero.level }} - {{ hero.rank.label }} Rank</small>
+        </span>
+      </div>
+    </aside>
+
+    <main class="legendary-main">
+      <header class="legendary-topbar">
+        <div class="legendary-title">
+          <span class="legendary-kicker">{{ hero.name }}</span>
+          <h1>{{ hero.name }}</h1>
+          <p>{{ hero.subtitle }}</p>
+        </div>
+
+        <div class="legendary-actions">
+          <button class="legendary-icon-button" type="button" aria-label="Notifications">N</button>
+          <span class="legendary-streak" data-streak-display>{{ habits_summary.streak_days }} Day Streak</span>
+          <label class="legendary-field legendary-theme-field">
+            <span>Theme</span>
+            <select data-theme-select>
+              <option value="minimal-dark">Minimal Dark RPG</option>
+              <option value="cyberpunk">Cyberpunk Life RPG</option>
+              <option value="living-world">Living World</option>
+              <option value="adventurers-journal">Adventurer's Journal</option>
+              <option value="premium-hybrid">Legendary Hero</option>
+            </select>
+          </label>
+          <button class="legendary-icon-button" type="button" aria-label="Settings">S</button>
+        </div>
+      </header>
+
+      <form method="get" class="legendary-range-bar">
+        <label class="legendary-field">
+          <span>Range</span>
+          <select name="range">
+            {% for value, label in range_options %}
+              <option value="{{ value }}"{% if selected_range.key == value %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="legendary-field">
+          <span>From</span>
+          <input type="date" name="start" value="{{ selected_range.start_date|date:'Y-m-d' }}">
+        </label>
+        <label class="legendary-field">
+          <span>To</span>
+          <input type="date" name="end" value="{{ selected_range.end_date|date:'Y-m-d' }}">
+        </label>
+        <button class="theme-button legendary-submit" type="submit">Apply</button>
+      </form>
+
+      {% if messages %}
+        <section class="legendary-messages">
+          {% for message in messages %}
+            <p class="theme-message">{{ message }}</p>
+          {% endfor %}
+        </section>
+      {% endif %}
+
+      <section class="legendary-hero">
+        <article class="theme-card legendary-character-card">
+          <div class="legendary-avatar legendary-avatar-large">{{ hero.name|first|upper }}</div>
+          <div class="legendary-character-copy">
+            <span class="legendary-kicker">{{ hero.main_skill }}</span>
+            <h2>Level {{ hero.level }}</h2>
+            <div class="legendary-xp-meta">
+              <span data-xp-value data-base-xp="{{ hero.total_xp }}">{{ hero.total_xp }} XP</span>
+              <span>{{ hero.next_level_xp }} XP next level</span>
+            </div>
+            <div class="theme-progress legendary-xp-track" aria-label="XP progress">
+              <span class="theme-progress-fill" style="width: {{ hero.progress_percent }}%"></span>
+            </div>
+          </div>
+        </article>
+
+        <article class="theme-card legendary-rank-card">
+          <span class="legendary-kicker">Rank</span>
+          <strong>{{ hero.rank.label }}</strong>
+          <small>Threshold level {{ hero.rank.threshold }}</small>
+        </article>
+
+        <div class="legendary-resource-grid">
+          {% for resource in resource_cards %}
+            <article class="theme-card legendary-resource-card">
+              <span>{{ resource.name }}</span>
+              <strong>{{ resource.value }}<small>/{{ resource.max }}</small></strong>
+              <div class="theme-progress legendary-mini-track">
+                <span class="theme-status-fill" style="width: {{ resource.progress }}%"></span>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="legendary-content-grid">
+        <article class="theme-card legendary-card legendary-attributes-card">
+          <div class="legendary-card-header">
+            <h2>Attributes</h2>
+            <span>Growth</span>
+          </div>
+          <div class="legendary-attribute-list">
+            {% for attribute in attribute_rows %}
+              <div class="legendary-attribute-row">
+                <div class="legendary-attribute-top">
+                  <span>{{ attribute.name }}</span>
+                  <strong>{{ attribute.value }}</strong>
+                </div>
+                <div class="theme-progress legendary-attribute-track">
+                  <span class="theme-progress-fill" style="width: {{ attribute.progress }}%"></span>
+                </div>
+                <small>{{ attribute.growth }}</small>
+              </div>
+            {% endfor %}
+          </div>
+        </article>
+
+        <article class="theme-card legendary-card legendary-quests-card">
+          <div class="legendary-card-header">
+            <h2>Today's Quests</h2>
+            <span>{{ stats.range_xp }} XP</span>
+          </div>
+          <div class="legendary-quest-list">
+            {% for quest in daily_quests %}
+              <article
+                class="legendary-quest-item{% if quest.completed %} is-complete{% endif %}"
+                data-quest-item
+                data-state-key="quest-{{ selected_range.start_date|date:'Y-m-d' }}-{{ forloop.counter }}"
+                data-reward-xp="{{ quest.reward_xp }}"
+                data-initial-complete="{% if quest.completed %}true{% else %}false{% endif %}"
+                role="button"
+                tabindex="0"
+                aria-pressed="{% if quest.completed %}true{% else %}false{% endif %}"
+              >
+                <span class="legendary-check" aria-hidden="true"></span>
+                <div>
+                  <strong>{{ quest.title }}</strong>
+                  <small>{{ quest.current }} / {{ quest.target }} {{ quest.unit }}</small>
+                  <div class="theme-progress legendary-mini-track">
+                    <span class="theme-progress-fill" style="width: {{ quest.progress }}%"></span>
+                  </div>
+                </div>
+                <span class="legendary-reward">+{{ quest.reward_xp }} XP</span>
+              </article>
+            {% endfor %}
+          </div>
+        </article>
+
+        <article class="theme-card legendary-card legendary-challenge-card">
+          <div class="legendary-card-header">
+            <h2>Active Challenge</h2>
+            <span>Epic</span>
+          </div>
+          <div class="legendary-challenge-body">
+            <span class="legendary-badge">CH</span>
+            <div>
+              <h3>{{ active_challenge.name }}</h3>
+              <p>Day {{ active_challenge.day }} / {{ active_challenge.total }}</p>
+            </div>
+          </div>
+          <div class="theme-progress legendary-xp-track">
+            <span class="theme-progress-fill" style="width: {{ active_challenge.progress }}%"></span>
+          </div>
+          <div class="legendary-reward-panel">
+            <span>Reward</span>
+            <strong>{{ active_challenge.reward }}</strong>
+            <small>+{{ active_challenge.xp_reward }} XP</small>
+          </div>
+        </article>
+      </section>
+
+      <section class="legendary-mid-grid">
+        <article class="theme-card legendary-card legendary-habits-card">
+          <div class="legendary-card-header">
+            <h2>Habits</h2>
+            <span>{{ habits_summary.streak_days }} Day Streak</span>
+          </div>
+          <div class="legendary-habit-summary">
+            <strong data-habit-summary data-total-habits="{{ habits_summary.total }}">{{ habits_summary.completed }}/{{ habits_summary.total }}</strong>
+            <span>completed today</span>
+          </div>
+          <div class="legendary-habit-dots">
+            {% for habit in habits %}
+              <button
+                type="button"
+                class="legendary-habit-dot{% if habit.completed %} is-done{% endif %}"
+                title="{{ habit.label }}"
+                aria-label="{{ habit.label }}"
+                data-habit-dot
+                data-state-key="habit-{{ selected_range.start_date|date:'Y-m-d' }}-{{ forloop.counter }}"
+                data-initial-complete="{% if habit.completed %}true{% else %}false{% endif %}"
+                aria-pressed="{% if habit.completed %}true{% else %}false{% endif %}"
+              ></button>
+            {% endfor %}
+          </div>
+        </article>
+
+        <article class="theme-card legendary-card legendary-weekly-card">
+          <div class="legendary-card-header">
+            <h2>Weekly Progress</h2>
+            <span>{{ selected_range.label }}</span>
+          </div>
+          <div class="legendary-weekly-layout">
+            <div class="legendary-bars" aria-label="Weekly XP bars">
+              {% for bar in weekly_progress.bars %}
+                <div class="legendary-bar-column">
+                  <span class="legendary-bar-value">{{ bar.xp }}</span>
+                  <span class="legendary-bar-track">
+                    <span class="legendary-bar-fill" style="height: {{ bar.height }}%"></span>
+                  </span>
+                  <small>{{ bar.label }}</small>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="legendary-weekly-summary">
+              <strong>+{{ weekly_progress.xp }} XP</strong>
+              <span>+{{ weekly_progress.quests }} Quests</span>
+              <span>+{{ weekly_progress.levels }} Levels</span>
+            </div>
+          </div>
+          <div class="legendary-chart-row">
+            <canvas id="xpChart" height="130"></canvas>
+            <canvas id="timeChart" height="130"></canvas>
+          </div>
+        </article>
+      </section>
+
+      <section class="legendary-bottom-grid">
+        <article class="theme-card legendary-card legendary-achievements-card">
+          <div class="legendary-card-header">
+            <h2>Achievements</h2>
+            <span>Archive</span>
+          </div>
+          <div class="legendary-achievement-list">
+            {% for achievement in achievements %}
+              <article class="legendary-achievement{% if achievement.unlocked %} is-unlocked{% endif %} {{ achievement.rarity }}">
+                <span class="legendary-achievement-mark">A</span>
+                <div>
+                  <strong>{{ achievement.title }}</strong>
+                  <small>{{ achievement.meta }}</small>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </article>
+
+        <article class="theme-card legendary-card legendary-journal-card">
+          <div class="legendary-card-header">
+            <h2>Journal</h2>
+            <span>Recent</span>
+          </div>
+          <div class="legendary-journal-list">
+            {% for entry in journal_entries %}
+              <article class="legendary-journal-entry">
+                <small>{{ entry.meta }}</small>
+                <strong>{{ entry.title }}</strong>
+                <p>{{ entry.body }}</p>
+              </article>
+            {% endfor %}
+          </div>
+          <div class="legendary-journal-actions">
+            <button type="button" class="legendary-secondary-button">Continue Story -></button>
+            <button type="button" class="legendary-secondary-button">View Journal -></button>
+          </div>
+        </article>
+      </section>
+
+      <section class="legendary-utility-grid">
+        <article class="theme-card legendary-card legendary-skills-card">
+          <div class="legendary-card-header">
+            <h2>Skills</h2>
+            <span>{{ stats.total_xp }} XP total</span>
+          </div>
+          {% if skill_rows %}
+            <div class="legendary-skill-list">
+              {% for row in skill_rows %}
+                <article class="legendary-skill-row">
+                  <div>
+                    <strong>{{ row.skill.name }}</strong>
+                    <small>Level {{ row.level }} - {{ row.total_xp }} XP total - {{ row.range_xp }} XP in range</small>
+                  </div>
+                  <span>{{ row.range_minutes }} min</span>
+                  <div class="theme-progress legendary-mini-track">
+                    <span class="theme-progress-fill" style="width: {{ row.progress.percent }}%"></span>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="legendary-empty">No skills yet. Add them in Django Admin or run the seed command.</p>
+          {% endif %}
+        </article>
+
+        <article class="theme-card legendary-card legendary-log-card">
+          <div class="legendary-card-header">
+            <h2>Log Activity</h2>
+            <span>Manual</span>
+          </div>
+          <form method="post" class="legendary-activity-form">
+            {% csrf_token %}
+            {% if activity_form.non_field_errors %}
+              <div class="theme-error legendary-form-error">
+                {{ activity_form.non_field_errors }}
+              </div>
+            {% endif %}
+            {% for field in activity_form %}
+              <label class="legendary-field">
+                <span>{{ field.label }}</span>
+                {{ field }}
+                {% if field.errors %}
+                  <small class="theme-accent">{{ field.errors|join:", " }}</small>
+                {% endif %}
+              </label>
+            {% endfor %}
+            <button class="theme-button legendary-submit" type="submit">Add Activity</button>
+          </form>
+        </article>
+
+        <article class="theme-card legendary-card legendary-status-card">
+          <div class="legendary-card-header">
+            <h2>Status Signals</h2>
+            <span>Now</span>
+          </div>
+          {% if latest_statuses %}
+            <div class="legendary-status-list">
+              {% for status in latest_statuses %}
+                <article class="legendary-status-row">
+                  <div>
+                    <strong>{{ status.definition.name }}</strong>
+                    {% if status.entry %}
+                      <small>{{ status.entry.value }}/100</small>
+                    {% else %}
+                      <small>No entry</small>
+                    {% endif %}
+                  </div>
+                  <div class="theme-progress legendary-mini-track">
+                    {% if status.entry %}
+                      <span class="theme-status-fill" style="width: {{ status.entry.value }}%"></span>
+                    {% endif %}
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="legendary-empty">No statuses yet. Add them in Django Admin or run the seed command.</p>
+          {% endif %}
+        </article>
+      </section>
+    </main>
+
+    {{ xp_chart|json_script:"xp-chart-data" }}
+    {{ time_chart|json_script:"time-chart-data" }}
+    <script src="{% static 'dashboard/themes.js' %}"></script>
+    <script>
+      const xpChart = JSON.parse(document.getElementById("xp-chart-data").textContent);
+      const timeChart = JSON.parse(document.getElementById("time-chart-data").textContent);
+      const renderedCharts = {};
+
+      function themeVar(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      }
+
+      function drawLineChart(canvasId, label, data, color) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !window.Chart) {
+          return;
+        }
+        if (renderedCharts[canvasId]) {
+          renderedCharts[canvasId].destroy();
+        }
+        renderedCharts[canvasId] = new Chart(canvas, {
+          type: "line",
+          data: {
+            labels: data.labels,
+            datasets: [{
+              label: label,
+              data: data.values,
+              borderColor: color,
+              backgroundColor: color,
+              pointBackgroundColor: color,
+              pointBorderColor: color,
+              tension: 0.25
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                ticks: { color: themeVar("--muted") },
+                grid: { color: themeVar("--border") }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: themeVar("--muted") },
+                grid: { color: themeVar("--border") }
+              }
+            }
+          }
+        });
+      }
+
+      function renderThemeCharts() {
+        drawLineChart("xpChart", "XP", xpChart, themeVar("--accent"));
+        drawLineChart("timeChart", "Minutes", timeChart, themeVar("--success"));
+      }
+
+      renderThemeCharts();
+      window.addEventListener("life-rpg-theme-change", renderThemeCharts);
+    </script>
+  </body>
+</html>
