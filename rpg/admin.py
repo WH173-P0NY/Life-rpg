@@ -6,6 +6,9 @@ from .models import (
     Achievement,
     AchievementUnlock,
     CharacterIdentity,
+    Campaign,
+    CampaignQuest,
+    CampaignQuestDependency,
     Challenge,
     ChallengeCheckIn,
     ChallengeReward,
@@ -68,6 +71,70 @@ class QuestRewardAdmin(admin.ModelAdmin):
     list_filter = ("quest", "skill")
     search_fields = ("quest__title", "skill__name")
     autocomplete_fields = ("quest", "skill")
+
+
+class CampaignQuestInline(admin.TabularInline):
+    model = CampaignQuest
+    extra = 1
+    autocomplete_fields = ("quest",)
+    fields = (
+        "quest",
+        "stage",
+        "order",
+        "node_kind",
+        "is_required",
+        "unlock_mode",
+        "map_x",
+        "map_y",
+    )
+
+
+@admin.register(Campaign)
+class CampaignAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "status",
+        "created_by",
+        "difficulty",
+        "reward_xp",
+        "due_on",
+        "completed_at",
+    )
+    list_filter = ("status", "created_by", "difficulty", "life_area")
+    search_fields = ("title", "description", "ai_prompt")
+    readonly_fields = ("completed_at", "xp_awarded_at", "created_at", "updated_at")
+    autocomplete_fields = ("owner", "life_area", "reward_skill")
+    inlines = (CampaignQuestInline,)
+
+
+@admin.register(CampaignQuest)
+class CampaignQuestAdmin(admin.ModelAdmin):
+    list_display = (
+        "campaign",
+        "quest",
+        "stage",
+        "order",
+        "node_kind",
+        "is_required",
+        "unlock_mode",
+        "map_x",
+        "map_y",
+    )
+    list_filter = ("campaign", "stage", "node_kind", "is_required", "unlock_mode")
+    search_fields = ("campaign__title", "quest__title", "stage")
+    autocomplete_fields = ("campaign", "quest")
+
+
+@admin.register(CampaignQuestDependency)
+class CampaignQuestDependencyAdmin(admin.ModelAdmin):
+    list_display = ("depends_on", "campaign_quest", "created_at")
+    list_filter = ("campaign_quest__campaign",)
+    search_fields = (
+        "campaign_quest__campaign__title",
+        "campaign_quest__quest__title",
+        "depends_on__quest__title",
+    )
+    autocomplete_fields = ("campaign_quest", "depends_on")
 
 
 @admin.register(Habit)

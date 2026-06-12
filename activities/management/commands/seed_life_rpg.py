@@ -11,6 +11,10 @@ from planner.models import CalendarEvent, CalendarEventType
 from rpg.choices import (
     AchievementRarity,
     AchievementTrigger,
+    CampaignCreatedBy,
+    CampaignDifficulty,
+    CampaignQuestUnlockMode,
+    CampaignStatus,
     ChallengeStatus,
     CreationSource,
     GoalPriority,
@@ -25,6 +29,8 @@ from rpg.choices import (
 )
 from rpg.models import (
     Achievement,
+    Campaign,
+    CampaignQuest,
     CharacterIdentity,
     Challenge,
     ChallengeReward,
@@ -37,6 +43,7 @@ from rpg.models import (
     Quest,
     QuestReward,
 )
+from rpg.campaign_services import set_campaign_dependencies
 from skills.models import LifeArea, Skill
 from statuses.models import StatusDefinition, StatusEntry
 
@@ -55,6 +62,7 @@ class Command(BaseCommand):
         self._seed_habit_milestones(skills)
         goals = self._seed_goals(areas, skills)
         challenge = self._seed_challenges(goals, skills)
+        self._seed_campaigns(areas, skills)
         self._seed_achievements(goals, challenge)
         statuses = self._seed_status_definitions()
         self._seed_sample_activities(definitions)
@@ -465,6 +473,191 @@ class Command(BaseCommand):
                 defaults={"xp_amount": xp_amount},
             )
         return challenge
+
+    def _seed_campaigns(
+        self,
+        areas: dict[str, LifeArea],
+        skills: dict[str, Skill],
+    ) -> None:
+        today = timezone.localdate()
+        campaign, _ = Campaign.objects.update_or_create(
+            title="Life RPG MVP Arc",
+            defaults={
+                "description": (
+                    "A guided campaign that connects the first Life RPG mechanics "
+                    "into one playable MVP loop."
+                ),
+                "status": CampaignStatus.DRAFT,
+                "created_by": CampaignCreatedBy.SYSTEM,
+                "difficulty": CampaignDifficulty.EPIC,
+                "life_area": areas["Craft & Work"],
+                "starts_on": today,
+                "due_on": today + timedelta(days=21),
+                "reward_xp": 500,
+                "reward_skill": skills["Programming"],
+                "reward_title": "MVP Founder Badge",
+            },
+        )
+        quest_specs = (
+            (
+                "Define skills",
+                "Create and review the first editable skill catalog.",
+                "Foundation",
+                10,
+                10,
+                20,
+                "Programming",
+                30,
+                CampaignQuestUnlockMode.IMMEDIATE,
+            ),
+            (
+                "Add activity definitions",
+                "Create activity types that can grant XP to multiple skills.",
+                "Foundation",
+                20,
+                30,
+                20,
+                "Programming",
+                40,
+                CampaignQuestUnlockMode.AFTER_DEPENDENCIES,
+            ),
+            (
+                "Complete first daily quest",
+                "Finish one daily quest and confirm XP is awarded.",
+                "RPG Core",
+                30,
+                50,
+                10,
+                "Learning",
+                35,
+                CampaignQuestUnlockMode.AFTER_DEPENDENCIES,
+            ),
+            (
+                "Complete first habit milestone",
+                "Reach or validate the first habit milestone reward path.",
+                "RPG Core",
+                40,
+                50,
+                35,
+                "Discipline" if "Discipline" in skills else "Learning",
+                50,
+                CampaignQuestUnlockMode.AFTER_DEPENDENCIES,
+            ),
+            (
+                "Add calendar event",
+                "Schedule a planning event in the calendar.",
+                "Planning",
+                50,
+                70,
+                10,
+                "Writing",
+                25,
+                CampaignQuestUnlockMode.AFTER_DEPENDENCIES,
+            ),
+            (
+                "Write journal reflection",
+                "Write a reflection about what changed in the system.",
+                "Planning",
+                60,
+                82,
+                20,
+                "Writing",
+                35,
+                CampaignQuestUnlockMode.AFTER_DEPENDENCIES,
+            ),
+            (
+                "Complete MVP review",
+                "Review the Life RPG MVP and define the next implementation arc.",
+                "Finish",
+                70,
+                94,
+                20,
+                "Programming",
+                75,
+                CampaignQuestUnlockMode.AFTER_DEPENDENCIES,
+            ),
+        )
+        nodes: dict[str, CampaignQuest] = {}
+        for (
+            title,
+            description,
+            stage,
+            order,
+            map_x,
+            map_y,
+            skill_name,
+            xp_amount,
+            unlock_mode,
+        ) in quest_specs:
+            quest, _ = Quest.objects.update_or_create(
+                title=title,
+                defaults={
+                    "description": description,
+                    "quest_type": QuestType.ONE_TIME,
+                    "status": QuestStatus.ACTIVE,
+                    "difficulty": QuestDifficulty.NORMAL,
+                    "target_value": 1,
+                    "target_unit": TargetUnit.CHECK,
+                    "created_by": CreationSource.SYSTEM,
+                    "sort_order": 200 + order,
+                },
+            )
+            QuestReward.objects.update_or_create(
+                quest=quest,
+                skill=skills[skill_name],
+                defaults={"xp_amount": xp_amount},
+            )
+            node, _ = CampaignQuest.objects.update_or_create(
+                campaign=campaign,
+                quest=quest,
+                defaults={
+                    "stage": stage,
+                    "order": order,
+                    "is_required": True,
+                    "unlock_mode": unlock_mode,
+                    "map_x": map_x,
+                    "map_y": map_y,
+                },
+            )
+            nodes[title] = node
+
+        set_campaign_dependencies(
+            campaign=campaign,
+            dependencies=[
+                {
+                    "campaign_quest_id": nodes["Add activity definitions"].id,
+                    "depends_on_id": nodes["Define skills"].id,
+                },
+                {
+                    "campaign_quest_id": nodes["Complete first daily quest"].id,
+                    "depends_on_id": nodes["Add activity definitions"].id,
+                },
+                {
+                    "campaign_quest_id": nodes["Complete first habit milestone"].id,
+                    "depends_on_id": nodes["Add activity definitions"].id,
+                },
+                {
+                    "campaign_quest_id": nodes["Add calendar event"].id,
+                    "depends_on_id": nodes["Complete first daily quest"].id,
+                },
+                {
+                    "campaign_quest_id": nodes["Write journal reflection"].id,
+                    "depends_on_id": nodes["Add calendar event"].id,
+                },
+                {
+                    "campaign_quest_id": nodes["Complete MVP review"].id,
+                    "depends_on_id": nodes["Write journal reflection"].id,
+                },
+                {
+                    "campaign_quest_id": nodes["Complete MVP review"].id,
+                    "depends_on_id": nodes["Complete first habit milestone"].id,
+                },
+            ],
+        )
+        campaign.status = CampaignStatus.ACTIVE
+        campaign.starts_on = campaign.starts_on or today
+        campaign.full_clean()
+        campaign.save(update_fields=["status", "starts_on", "updated_at"])
 
     def _seed_achievements(
         self,

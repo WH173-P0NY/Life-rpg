@@ -21,6 +21,41 @@ class QuestDifficulty(models.TextChoices):
     EPIC = "epic", "Epic"
 
 
+class CampaignStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    ACTIVE = "active", "Active"
+    COMPLETED = "completed", "Completed"
+    ARCHIVED = "archived", "Archived"
+
+
+class CampaignCreatedBy(models.TextChoices):
+    USER = "user", "User"
+    AI = "ai", "AI"
+    SYSTEM = "system", "System"
+
+
+class CampaignDifficulty(models.TextChoices):
+    EASY = "easy", "Easy"
+    NORMAL = "normal", "Normal"
+    HARD = "hard", "Hard"
+    EPIC = "epic", "Epic"
+    LEGENDARY = "legendary", "Legendary"
+
+
+class CampaignQuestUnlockMode(models.TextChoices):
+    IMMEDIATE = "immediate", "Immediate"
+    AFTER_DEPENDENCIES = "after_dependencies", "After dependencies"
+    MANUAL = "manual", "Manual"
+
+
+class CampaignNodeKind(models.TextChoices):
+    QUEST = "quest", "Quest"
+    MILESTONE = "milestone", "Milestone"
+    REWARD = "reward", "Reward"
+    REFLECTION = "reflection", "Reflection"
+    GATE = "gate", "Gate"
+
+
 class CreationSource(models.TextChoices):
     MANUAL = "manual", "Manual"
     SYSTEM = "system", "System"
@@ -83,6 +118,7 @@ class AchievementTrigger(models.TextChoices):
     HABIT_STREAK = "habit_streak", "Habit streak"
     CHALLENGE_COMPLETED = "challenge_completed", "Challenge completed"
     GOAL_COMPLETED = "goal_completed", "Goal completed"
+    CAMPAIGN_COMPLETED = "campaign_completed", "Campaign completed"
     JOURNAL_STREAK = "journal_streak", "Journal streak"
 
 
@@ -93,6 +129,7 @@ class JournalEntryType(models.TextChoices):
     HABIT_MILESTONE = "habit_milestone", "Habit milestone"
     GOAL = "goal", "Goal"
     CHALLENGE = "challenge", "Challenge"
+    CAMPAIGN = "campaign", "Campaign"
     ACHIEVEMENT = "achievement", "Achievement"
     SYSTEM = "system", "System"
 

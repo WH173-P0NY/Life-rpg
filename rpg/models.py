@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q, Sum
@@ -11,6 +12,11 @@ from django.utils.text import slugify
 from .choices import (
     AchievementRarity,
     AchievementTrigger,
+    CampaignCreatedBy,
+    CampaignDifficulty,
+    CampaignNodeKind,
+    CampaignQuestUnlockMode,
+    CampaignStatus,
     ChallengeCadence,
     ChallengeStatus,
     CreationSource,
@@ -89,7 +95,11 @@ class Quest(models.Model):
             raise ValidationError(
                 {"available_until": "Available until cannot be before available from."}
             )
-        if self.created_by == CreationSource.AI and self.status != QuestStatus.DRAFT:
+        if (
+            self._state.adding
+            and self.created_by == CreationSource.AI
+            and self.status != QuestStatus.DRAFT
+        ):
             raise ValidationError(
                 {"status": "AI-created quests must start as draft."}
             )
@@ -191,6 +201,222 @@ class QuestCompletion(models.Model):
                     )
                 }
             )
+
+
+class Campaign(models.Model):
+    title = models.CharField(max_length=180)
+    description = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=CampaignStatus.choices,
+        default=CampaignStatus.DRAFT,
+    )
+    created_by = models.CharField(
+        max_length=20,
+        choices=CampaignCreatedBy.choices,
+        default=CampaignCreatedBy.USER,
+    )
+    difficulty = models.CharField(
+        max_length=20,
+        choices=CampaignDifficulty.choices,
+        default=CampaignDifficulty.NORMAL,
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="campaigns",
+    )
+    life_area = models.ForeignKey(
+        "skills.LifeArea",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="campaigns",
+    )
+    starts_on = models.DateField(null=True, blank=True)
+    due_on = models.DateField(null=True, blank=True)
+    reward_xp = models.PositiveIntegerField(default=0)
+    reward_skill = models.ForeignKey(
+        "skills.Skill",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="campaign_rewards",
+    )
+    reward_title = models.CharField(max_length=180, blank=True)
+    ai_prompt = models.TextField(blank=True)
+    ai_provider = models.CharField(max_length=40, blank=True)
+    ai_model = models.CharField(max_length=120, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    xp_awarded_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["status", "due_on", "title"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(title=""),
+                name="rpg_campaign_title_not_empty",
+            ),
+            models.CheckConstraint(
+                condition=Q(reward_xp__gte=0),
+                name="rpg_campaign_reward_xp_gte_0",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(due_on__isnull=True)
+                    | Q(starts_on__isnull=True)
+                    | Q(due_on__gte=models.F("starts_on"))
+                ),
+                name="rpg_campaign_due_on_gte_starts_on",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def clean(self) -> None:
+        self.title = self.title.strip()
+        self.description = self.description.strip()
+        self.reward_title = self.reward_title.strip()
+        self.ai_prompt = self.ai_prompt.strip()
+        self.ai_provider = self.ai_provider.strip()
+        self.ai_model = self.ai_model.strip()
+        if not self.title:
+            raise ValidationError({"title": "Campaign title cannot be empty."})
+        if self.starts_on and self.due_on and self.due_on < self.starts_on:
+            raise ValidationError({"due_on": "Due on cannot be before starts on."})
+        if self.reward_xp and self.reward_skill_id is None:
+            raise ValidationError(
+                {"reward_skill": "Campaign XP reward requires a reward skill."}
+            )
+        if self.status == CampaignStatus.COMPLETED and self.completed_at is None:
+            raise ValidationError(
+                {"completed_at": "Completed campaigns require completed_at."}
+            )
+        if self.completed_at and self.status != CampaignStatus.COMPLETED:
+            raise ValidationError(
+                {"status": "Completed campaigns must use completed status."}
+            )
+        if self.xp_awarded_at and self.completed_at is None:
+            raise ValidationError(
+                {"xp_awarded_at": "Campaign XP can be awarded only after completion."}
+            )
+        if self.status == CampaignStatus.DRAFT and self.xp_awarded_at is not None:
+            raise ValidationError({"status": "Draft campaigns cannot award XP."})
+
+    def reward_xp_total(self) -> int:
+        return int(self.reward_xp or 0)
+
+
+class CampaignQuest(models.Model):
+    campaign = models.ForeignKey(
+        Campaign,
+        on_delete=models.CASCADE,
+        related_name="campaign_quests",
+    )
+    quest = models.ForeignKey(
+        Quest,
+        on_delete=models.CASCADE,
+        related_name="campaign_links",
+    )
+    stage = models.CharField(max_length=120, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    is_required = models.BooleanField(default=True)
+    unlock_mode = models.CharField(
+        max_length=30,
+        choices=CampaignQuestUnlockMode.choices,
+        default=CampaignQuestUnlockMode.AFTER_DEPENDENCIES,
+    )
+    node_kind = models.CharField(
+        max_length=20,
+        choices=CampaignNodeKind.choices,
+        default=CampaignNodeKind.QUEST,
+    )
+    config = models.JSONField(default=dict, blank=True)
+    map_x = models.PositiveIntegerField(default=0)
+    map_y = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["campaign", "stage", "order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["campaign", "quest"],
+                name="rpg_campaign_quest_unique_campaign_quest",
+            ),
+            models.CheckConstraint(
+                condition=Q(order__gte=0),
+                name="rpg_campaign_quest_order_gte_0",
+            ),
+            models.CheckConstraint(
+                condition=Q(map_x__gte=0),
+                name="rpg_campaign_quest_map_x_gte_0",
+            ),
+            models.CheckConstraint(
+                condition=Q(map_y__gte=0),
+                name="rpg_campaign_quest_map_y_gte_0",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.campaign}: {self.quest}"
+
+    def clean(self) -> None:
+        self.stage = self.stage.strip()
+        if self.config is None:
+            self.config = {}
+        if not isinstance(self.config, dict):
+            raise ValidationError({"config": "Campaign node config must be an object."})
+
+
+class CampaignQuestDependency(models.Model):
+    campaign_quest = models.ForeignKey(
+        CampaignQuest,
+        on_delete=models.CASCADE,
+        related_name="dependencies",
+    )
+    depends_on = models.ForeignKey(
+        CampaignQuest,
+        on_delete=models.CASCADE,
+        related_name="unlocks",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["campaign_quest__campaign", "campaign_quest__order", "depends_on__order"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["campaign_quest", "depends_on"],
+                name="rpg_campaign_dependency_unique_edge",
+            ),
+            models.CheckConstraint(
+                condition=~Q(campaign_quest=models.F("depends_on")),
+                name="rpg_campaign_dependency_not_self",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.depends_on} -> {self.campaign_quest}"
+
+    def clean(self) -> None:
+        if (
+            self.campaign_quest_id
+            and self.depends_on_id
+            and self.campaign_quest_id == self.depends_on_id
+        ):
+            raise ValidationError(
+                {"depends_on": "Campaign quest cannot depend on itself."}
+            )
+        if self.campaign_quest_id and self.depends_on_id:
+            if self.campaign_quest.campaign_id != self.depends_on.campaign_id:
+                raise ValidationError(
+                    {"depends_on": "Campaign dependencies cannot cross campaigns."}
+                )
 
 
 class Habit(models.Model):

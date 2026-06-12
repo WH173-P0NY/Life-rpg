@@ -203,6 +203,27 @@
     @apply w-full rounded-lg border border-xp/40 bg-gradient-to-r from-xp to-[#F0C85A] px-4 py-2.5 text-sm font-semibold text-[#141109] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
+  .react-flow {
+    background:
+      radial-gradient(circle at 20% 10%, rgb(var(--color-xp) / 0.08), transparent 26%),
+      linear-gradient(180deg, rgb(5 7 12 / 0.7), rgb(8 10 16 / 0.92));
+  }
+
+  .react-flow__controls-button {
+    background: rgb(var(--color-surface-strong) / 0.9);
+    border-color: rgb(var(--color-border));
+    color: rgb(var(--color-text-primary));
+  }
+
+  .react-flow__controls-button:hover {
+    background: rgb(var(--color-xp) / 0.14);
+  }
+
+  .react-flow__edge.selected .react-flow__edge-path {
+    stroke: rgb(var(--color-xp));
+    stroke-width: 3;
+  }
+
   .theme-switcher {
     @apply grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:w-auto xl:grid-cols-5;
   }

@@ -14,6 +14,7 @@ from skills.models import XpEvent
 from .exceptions import RpgDomainError, RpgValidationError
 from .models import (
     Achievement,
+    Campaign,
     Challenge,
     Goal,
     Habit,
@@ -23,6 +24,29 @@ from .models import (
     JournalEntry,
     Quest,
     QuestCompletion,
+)
+from .campaign_services import (
+    activate_campaign,
+    add_quest_to_campaign,
+    archive_campaign,
+    build_campaign_rows,
+    bulk_update_campaign_node_positions,
+    create_campaign,
+    create_campaign_edge,
+    create_campaign_node,
+    delete_campaign_edge,
+    delete_campaign_node,
+    generate_campaign_draft,
+    get_campaign_detail,
+    publish_campaign,
+    replace_campaign_edges,
+    serialize_campaign_studio,
+    serialize_campaign_studio_edge,
+    serialize_campaign_studio_node,
+    set_campaign_dependencies,
+    update_campaign,
+    update_campaign_node,
+    validate_campaign_studio,
 )
 from .services import (
     archive_goal,
@@ -104,6 +128,395 @@ def toggle_habit_api(request: HttpRequest, habit_id: int) -> JsonResponse:
         return _domain_error_response(exc)
 
     return JsonResponse(_serialize_habit_toggle_response(result))
+
+
+@require_http_methods(["GET", "POST"])
+def campaigns_api(request: HttpRequest) -> JsonResponse:
+    if request.method == "GET":
+        try:
+            campaigns = build_campaign_rows(
+                status=_optional_string(request.GET.get("status")) or "all",
+                created_by=_optional_string(request.GET.get("created_by")),
+                active_only=_optional_bool(request.GET.get("active_only")),
+            )
+        except RpgDomainError as exc:
+            return _domain_error_response(exc)
+        return JsonResponse({"campaigns": campaigns})
+
+    try:
+        payload = _json_payload(request)
+        campaign = create_campaign(
+            title=_required_string(payload.get("title"), field_name="title"),
+            description=_optional_string(payload.get("description")),
+            difficulty=_optional_string(payload.get("difficulty")) or "normal",
+            status=_optional_string(payload.get("status")) or "draft",
+            starts_on=_optional_date(payload.get("starts_on")),
+            due_on=_optional_date(payload.get("due_on")),
+            life_area_id=_optional_int(payload.get("life_area_id"), field_name="life_area_id"),
+            reward_xp=_optional_int(payload.get("reward_xp"), field_name="reward_xp") or 0,
+            reward_skill_id=_optional_int(payload.get("reward_skill_id"), field_name="reward_skill_id"),
+            reward_title=_optional_string(payload.get("reward_title")),
+            owner_id=request.user.id if request.user.is_authenticated else None,
+        )
+        for quest_payload in _optional_object_list(payload.get("quests"), field_name="quests"):
+            add_quest_to_campaign(
+                campaign=campaign,
+                quest_id=_optional_int(quest_payload.get("quest_id"), field_name="quest_id"),
+                quest_title=_optional_string(quest_payload.get("title")),
+                quest_description=_optional_string(quest_payload.get("description")),
+                target_value=_optional_int(quest_payload.get("target_value"), field_name="target_value") or 1,
+                target_unit=_optional_string(quest_payload.get("target_unit")) or "count",
+                reward_skill_id=_optional_int(quest_payload.get("reward_skill_id"), field_name="reward_skill_id"),
+                reward_xp=_optional_int(quest_payload.get("reward_xp"), field_name="reward_xp") or 0,
+                stage=_optional_string(quest_payload.get("stage")),
+                order=_optional_int(quest_payload.get("order"), field_name="order") or 0,
+                is_required=_optional_bool(quest_payload.get("is_required"), default=True),
+                unlock_mode=_optional_string(quest_payload.get("unlock_mode")) or "after_dependencies",
+                map_x=_optional_int(quest_payload.get("map_x"), field_name="map_x") or 0,
+                map_y=_optional_int(quest_payload.get("map_y"), field_name="map_y") or 0,
+                depends_on_ids=_optional_id_list(quest_payload.get("depends_on_ids")),
+            )
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+
+    return JsonResponse(
+        {"campaign": get_campaign_detail(campaign), "dashboard_refresh_required": True},
+        status=201,
+    )
+
+
+@require_POST
+def campaign_ai_drafts_api(request: HttpRequest) -> JsonResponse:
+    try:
+        payload = _json_payload(request)
+        campaign = generate_campaign_draft(
+            goal=_required_string(payload.get("goal"), field_name="goal"),
+            timeframe_days=_optional_int(payload.get("timeframe_days"), field_name="timeframe_days"),
+            available_minutes_per_day=_optional_int(
+                payload.get("available_minutes_per_day"),
+                field_name="available_minutes_per_day",
+            ),
+            difficulty=_optional_string(payload.get("difficulty")) or "normal",
+            skill_ids=_optional_id_list(payload.get("skill_ids")),
+            notes=_optional_string(payload.get("notes")),
+            owner_id=request.user.id if request.user.is_authenticated else None,
+            ai_provider=_optional_string(payload.get("ai_provider")),
+            ai_model=_optional_string(payload.get("ai_model")),
+        )
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+
+    return JsonResponse(
+        {"campaign": get_campaign_detail(campaign), "dashboard_refresh_required": True},
+        status=201,
+    )
+
+
+@require_http_methods(["GET", "PATCH"])
+def campaign_detail_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    if request.method == "PATCH":
+        try:
+            payload = _json_payload(request)
+            updated = update_campaign(
+                campaign=campaign,
+                updates=_campaign_update_payload(payload),
+            )
+        except RpgDomainError as exc:
+            return _domain_error_response(exc)
+        return JsonResponse(
+            {
+                "campaign": get_campaign_detail(updated),
+                "dashboard_refresh_required": True,
+            }
+        )
+    return JsonResponse({"campaign": get_campaign_detail(campaign)})
+
+
+@require_http_methods(["GET"])
+def campaign_studio_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    return JsonResponse(serialize_campaign_studio(campaign))
+
+
+@require_http_methods(["GET"])
+def campaign_validate_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    return JsonResponse({"validation": validate_campaign_studio(campaign)})
+
+
+@require_POST
+def campaign_publish_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    validation = validate_campaign_studio(campaign)
+    if not validation["valid"]:
+        return JsonResponse(
+            {
+                "error": {
+                    "code": "campaign_not_ready",
+                    "message": "Campaign is not ready to publish.",
+                },
+                "validation": validation,
+            },
+            status=400,
+        )
+    try:
+        published = publish_campaign(campaign=campaign)
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+    return JsonResponse(
+        {
+            "campaign": get_campaign_detail(published),
+            "studio": serialize_campaign_studio(published),
+            "dashboard_refresh_required": True,
+        }
+    )
+
+
+@require_POST
+def campaign_activate_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        activated = activate_campaign(campaign=campaign)
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+    return JsonResponse(
+        {
+            "campaign": get_campaign_detail(activated),
+            "dashboard_refresh_required": True,
+        }
+    )
+
+
+@require_POST
+def campaign_archive_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        archived = archive_campaign(campaign=campaign)
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+    return JsonResponse(
+        {
+            "campaign": get_campaign_detail(archived),
+            "dashboard_refresh_required": True,
+        }
+    )
+
+
+@require_http_methods(["POST"])
+def campaign_nodes_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        payload = _json_payload(request)
+        position = _optional_position(payload.get("position")) or {}
+        node = create_campaign_node(
+            campaign=campaign,
+            node_kind=_optional_string(payload.get("node_kind")) or "quest",
+            quest_id=_optional_int(payload.get("quest_id"), field_name="quest_id"),
+            title=_optional_string(payload.get("title")),
+            description=_optional_string(payload.get("description")),
+            target_value=_optional_int(payload.get("target_value"), field_name="target_value") or 1,
+            target_unit=_optional_string(payload.get("target_unit")) or "check",
+            quest_type=_optional_string(payload.get("quest_type")) or "one_time",
+            difficulty=_optional_string(payload.get("difficulty")) or "normal",
+            reward_skill_id=_optional_int(payload.get("reward_skill_id"), field_name="reward_skill_id"),
+            reward_xp=_optional_int(payload.get("reward_xp"), field_name="reward_xp") or 0,
+            stage=_optional_string(payload.get("stage")),
+            order=_optional_int(payload.get("order"), field_name="order") or 0,
+            is_required=_optional_bool(payload.get("is_required"), default=True),
+            unlock_mode=_optional_string(payload.get("unlock_mode")) or "after_dependencies",
+            map_x=position.get("x", _optional_int(payload.get("map_x"), field_name="map_x") or 0),
+            map_y=position.get("y", _optional_int(payload.get("map_y"), field_name="map_y") or 0),
+            config=_optional_object(payload.get("config"), field_name="config"),
+        )
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+    return JsonResponse(
+        {
+            "node": serialize_campaign_studio_node(node),
+            "validation": validate_campaign_studio(campaign),
+            "dashboard_refresh_required": True,
+        },
+        status=201,
+    )
+
+
+@require_http_methods(["PATCH", "DELETE"])
+def campaign_node_detail_api(
+    request: HttpRequest,
+    campaign_id: int,
+    node_id: int,
+) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        if request.method == "DELETE":
+            delete_campaign_node(campaign=campaign, node_id=node_id)
+            return JsonResponse(
+                {
+                    "deleted_node_id": node_id,
+                    "validation": validate_campaign_studio(campaign),
+                    "dashboard_refresh_required": True,
+                }
+            )
+        payload = _json_payload(request)
+        node = update_campaign_node(
+            campaign=campaign,
+            node_id=node_id,
+            updates=_campaign_node_update_payload(payload),
+        )
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+    return JsonResponse(
+        {
+            "node": serialize_campaign_studio_node(node),
+            "validation": validate_campaign_studio(campaign),
+            "dashboard_refresh_required": True,
+        }
+    )
+
+
+@require_http_methods(["PATCH"])
+def campaign_node_positions_api(
+    request: HttpRequest,
+    campaign_id: int,
+) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        payload = _json_payload(request)
+        positions = _campaign_positions_payload(payload)
+        nodes = bulk_update_campaign_node_positions(
+            campaign=campaign,
+            positions=positions,
+        )
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+    return JsonResponse(
+        {
+            "nodes": [serialize_campaign_studio_node(node) for node in nodes],
+            "validation": validate_campaign_studio(campaign),
+            "dashboard_refresh_required": True,
+        }
+    )
+
+
+@require_http_methods(["POST", "PUT"])
+def campaign_edges_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        payload = _json_payload(request)
+        if request.method == "PUT":
+            edges = replace_campaign_edges(
+                campaign=campaign,
+                edges=_optional_object_list(payload.get("edges"), field_name="edges"),
+            )
+            return JsonResponse(
+                {
+                    "edges": [
+                        serialize_campaign_studio_edge(edge)
+                        for edge in edges
+                    ],
+                    "validation": validate_campaign_studio(campaign),
+                    "dashboard_refresh_required": True,
+                }
+            )
+        edge = create_campaign_edge(
+            campaign=campaign,
+            source_node_id=_required_int_field(
+                payload.get("source_node_id", payload.get("from")),
+                field_name="source_node_id",
+            ),
+            target_node_id=_required_int_field(
+                payload.get("target_node_id", payload.get("to")),
+                field_name="target_node_id",
+            ),
+        )
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+    return JsonResponse(
+        {
+            "edge": serialize_campaign_studio_edge(edge),
+            "validation": validate_campaign_studio(campaign),
+            "dashboard_refresh_required": True,
+        },
+        status=201,
+    )
+
+
+@require_http_methods(["DELETE"])
+def campaign_edge_detail_api(
+    request: HttpRequest,
+    campaign_id: int,
+    edge_id: int,
+) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        delete_campaign_edge(campaign=campaign, edge_id=edge_id)
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+    return JsonResponse(
+        {
+            "deleted_edge_id": edge_id,
+            "validation": validate_campaign_studio(campaign),
+            "dashboard_refresh_required": True,
+        }
+    )
+
+
+@require_POST
+def campaign_add_quest_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        payload = _json_payload(request)
+        add_quest_to_campaign(
+            campaign=campaign,
+            quest_id=_optional_int(payload.get("quest_id"), field_name="quest_id"),
+            quest_title=_optional_string(payload.get("title")),
+            quest_description=_optional_string(payload.get("description")),
+            target_value=_optional_int(payload.get("target_value"), field_name="target_value") or 1,
+            target_unit=_optional_string(payload.get("target_unit")) or "count",
+            quest_type=_optional_string(payload.get("quest_type")) or "one_time",
+            quest_difficulty=_optional_string(payload.get("difficulty")) or "normal",
+            reward_skill_id=_optional_int(payload.get("reward_skill_id"), field_name="reward_skill_id"),
+            reward_xp=_optional_int(payload.get("reward_xp"), field_name="reward_xp") or 0,
+            stage=_optional_string(payload.get("stage")),
+            order=_optional_int(payload.get("order"), field_name="order") or 0,
+            is_required=_optional_bool(payload.get("is_required"), default=True),
+            unlock_mode=_optional_string(payload.get("unlock_mode")) or "after_dependencies",
+            map_x=_optional_int(payload.get("map_x"), field_name="map_x") or 0,
+            map_y=_optional_int(payload.get("map_y"), field_name="map_y") or 0,
+            depends_on_ids=_optional_id_list(payload.get("depends_on_ids")),
+        )
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+
+    return JsonResponse(
+        {
+            "campaign": get_campaign_detail(campaign),
+            "dashboard_refresh_required": True,
+        },
+        status=201,
+    )
+
+
+@require_POST
+def campaign_dependencies_api(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    try:
+        payload = _json_payload(request)
+        dependencies = _optional_object_list(
+            payload.get("dependencies"),
+            field_name="dependencies",
+        )
+        set_campaign_dependencies(campaign=campaign, dependencies=dependencies)
+    except RpgDomainError as exc:
+        return _domain_error_response(exc)
+
+    return JsonResponse(
+        {
+            "campaign": get_campaign_detail(campaign),
+            "dashboard_refresh_required": True,
+        }
+    )
 
 
 @require_http_methods(["GET", "POST"])
@@ -619,6 +1032,131 @@ def _optional_int(value: Any, *, field_name: str) -> int | None:
     return parsed
 
 
+def _optional_bool(value: Any, *, default: bool = False) -> bool:
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    raise RpgValidationError("Boolean fields must be booleans.")
+
+
+def _optional_object_list(value: Any, *, field_name: str) -> list[dict[str, Any]]:
+    if value in (None, ""):
+        return []
+    if not isinstance(value, list):
+        raise RpgValidationError(f"{field_name} must be a list.")
+    rows: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise RpgValidationError(f"{field_name} must contain objects.")
+        rows.append(item)
+    return rows
+
+
+def _optional_object(value: Any, *, field_name: str) -> dict[str, Any] | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, dict):
+        raise RpgValidationError(f"{field_name} must be an object.")
+    return value
+
+
+def _optional_position(value: Any) -> dict[str, int] | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, dict):
+        raise RpgValidationError("position must be an object.")
+    return {
+        "x": _required_int_field(value.get("x"), field_name="position.x"),
+        "y": _required_int_field(value.get("y"), field_name="position.y"),
+    }
+
+
+def _campaign_update_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    updates: dict[str, Any] = {}
+    for key in (
+        "title",
+        "description",
+        "difficulty",
+        "reward_title",
+        "ai_prompt",
+        "ai_provider",
+        "ai_model",
+    ):
+        if key in payload:
+            updates[key] = _optional_string(payload.get(key))
+    for key in ("starts_on", "due_on"):
+        if key in payload:
+            updates[key] = _optional_date(payload.get(key))
+    for key in ("life_area_id", "reward_xp", "reward_skill_id"):
+        if key in payload:
+            updates[key] = _optional_int(payload.get(key), field_name=key)
+    return updates
+
+
+def _campaign_node_update_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    updates: dict[str, Any] = {}
+    for key in (
+        "title",
+        "description",
+        "stage",
+        "unlock_mode",
+        "node_kind",
+        "target_unit",
+        "quest_type",
+        "difficulty",
+    ):
+        if key in payload:
+            updates[key] = _optional_string(payload.get(key))
+    for key in (
+        "order",
+        "map_x",
+        "map_y",
+        "target_value",
+        "reward_xp",
+        "reward_skill_id",
+    ):
+        if key in payload:
+            updates[key] = _optional_int(payload.get(key), field_name=key)
+    if "is_required" in payload:
+        updates["is_required"] = _optional_bool(payload.get("is_required"))
+    if "position" in payload:
+        updates["position"] = _optional_position(payload.get("position"))
+    if "config" in payload:
+        updates["config"] = _optional_object(payload.get("config"), field_name="config") or {}
+    return updates
+
+
+def _campaign_positions_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    positions = _optional_object_list(payload.get("positions"), field_name="positions")
+    parsed: list[dict[str, Any]] = []
+    for row in positions:
+        node_id = _required_int_field(
+            row.get("node_id", row.get("id")),
+            field_name="node_id",
+        )
+        parsed_row: dict[str, Any] = {"node_id": node_id}
+        if "position" in row:
+            parsed_row["position"] = _optional_position(row.get("position"))
+        else:
+            parsed_row["map_x"] = _required_int_field(
+                row.get("map_x", row.get("x")),
+                field_name="map_x",
+            )
+            parsed_row["map_y"] = _required_int_field(
+                row.get("map_y", row.get("y")),
+                field_name="map_y",
+            )
+        parsed.append(parsed_row)
+    return parsed
+
+
 def _optional_present_int(payload: dict[str, Any], key: str) -> int | None:
     if key not in payload:
         return None
@@ -719,6 +1257,27 @@ def _serialize_completion_response(completion: QuestCompletion) -> dict[str, Any
             ),
         },
         "xp_events": [_serialize_xp_event(event) for event in xp_events],
+        "achievement_unlocks": [
+            serialize_achievement_unlock(unlock)
+            for unlock in getattr(completion, "_achievement_unlocks", [])
+        ],
+        "campaign_results": [
+            _serialize_campaign_completion_result(result)
+            for result in getattr(completion, "_campaign_results", [])
+        ],
+        "dashboard_refresh_required": True,
+    }
+
+
+def _serialize_campaign_completion_result(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "campaign": get_campaign_detail(result["campaign"]),
+        "completed": result["completed"],
+        "xp_events": [_serialize_xp_event(event) for event in result["xp_events"]],
+        "achievement_unlocks": [
+            serialize_achievement_unlock(unlock)
+            for unlock in result.get("achievement_unlocks", [])
+        ],
     }
 
 

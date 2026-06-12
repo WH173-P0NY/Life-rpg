@@ -13,6 +13,7 @@ from skills.models import Skill, XpEvent
 
 from .choices import (
     AchievementTrigger,
+    CampaignStatus,
     ChallengeStatus,
     CreationSource,
     GoalPriority,
@@ -36,6 +37,7 @@ from .exceptions import (
 from .models import (
     Achievement,
     AchievementUnlock,
+    Campaign,
     CharacterIdentity,
     Challenge,
     ChallengeCheckIn,
@@ -51,6 +53,7 @@ from .models import (
     Quest,
     QuestCompletion,
 )
+from .campaign_services import complete_campaigns_for_quest
 
 REFLECTION_QUESTIONS = (
     {
@@ -104,6 +107,7 @@ def complete_quest(
         source_type="quest_completion",
         source_id=completion.id,
     )
+    completion._campaign_results = complete_campaigns_for_quest(quest=completion.quest)
     return completion
 
 
@@ -151,6 +155,9 @@ def update_quest_progress(
         completion._achievement_unlocks = evaluate_achievements(
             source_type="quest_completion",
             source_id=completion.id,
+        )
+        completion._campaign_results = complete_campaigns_for_quest(
+            quest=completion.quest
         )
     return completion
 
@@ -1473,6 +1480,12 @@ def _achievement_condition_met(achievement: Achievement) -> bool:
         if goal_id:
             goals = goals.filter(id=goal_id)
         return goals.exists()
+    if trigger == AchievementTrigger.CAMPAIGN_COMPLETED:
+        campaign_id = config.get("campaign_id")
+        campaigns = Campaign.objects.filter(status=CampaignStatus.COMPLETED)
+        if campaign_id:
+            campaigns = campaigns.filter(id=campaign_id)
+        return campaigns.exists()
     if trigger == AchievementTrigger.JOURNAL_STREAK:
         entries = list(JournalEntry.objects.only("entry_date"))
         return _journal_entry_streak(entries) >= int(config.get("streak_days", 0))
@@ -1522,6 +1535,12 @@ def _achievement_progress(achievement: Achievement) -> dict[str, Any]:
             goals = goals.filter(id=config.get("goal_id"))
         current = 1 if goals.exists() else 0
         unit = "goal"
+    elif trigger == AchievementTrigger.CAMPAIGN_COMPLETED:
+        campaigns = Campaign.objects.filter(status=CampaignStatus.COMPLETED)
+        if config.get("campaign_id"):
+            campaigns = campaigns.filter(id=config.get("campaign_id"))
+        current = 1 if campaigns.exists() else 0
+        unit = "campaign"
     elif trigger == AchievementTrigger.JOURNAL_STREAK:
         current = _journal_entry_streak(list(JournalEntry.objects.only("entry_date")))
         target = int(config.get("streak_days", 1))

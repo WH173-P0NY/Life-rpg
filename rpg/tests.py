@@ -20,6 +20,11 @@ from skills.models import LifeArea, Skill, XpEvent
 from .choices import (
     AchievementRarity,
     AchievementTrigger,
+    CampaignCreatedBy,
+    CampaignDifficulty,
+    CampaignNodeKind,
+    CampaignQuestUnlockMode,
+    CampaignStatus,
     ChallengeStatus,
     CreationSource,
     GoalPriority,
@@ -39,10 +44,14 @@ from .exceptions import (
     QuestAlreadyCompletedError,
     QuestNotActiveError,
     QuestNotAvailableError,
+    RpgValidationError,
 )
 from .models import (
     Achievement,
     AchievementUnlock,
+    Campaign,
+    CampaignQuest,
+    CampaignQuestDependency,
     CharacterIdentity,
     Challenge,
     ChallengeCheckIn,
@@ -59,6 +68,22 @@ from .models import (
     Quest,
     QuestCompletion,
     QuestReward,
+)
+from .campaign_services import (
+    activate_campaign,
+    add_quest_to_campaign,
+    bulk_update_campaign_node_positions,
+    complete_campaign_if_ready,
+    create_campaign_edge,
+    create_campaign_node,
+    create_campaign,
+    delete_campaign_node,
+    generate_campaign_draft,
+    get_campaign_detail,
+    serialize_campaign_studio,
+    set_campaign_dependencies,
+    update_campaign_node,
+    validate_campaign_studio,
 )
 from .services import (
     build_daily_quest_rows,
@@ -109,6 +134,11 @@ class RpgFoundationTests(TestCase):
         self.assertEqual(QuestType.DAILY, "daily")
         self.assertEqual(QuestStatus.DRAFT, "draft")
         self.assertEqual(QuestDifficulty.NORMAL, "normal")
+        self.assertEqual(CampaignStatus.DRAFT, "draft")
+        self.assertEqual(CampaignCreatedBy.AI, "ai")
+        self.assertEqual(CampaignDifficulty.LEGENDARY, "legendary")
+        self.assertEqual(CampaignNodeKind.MILESTONE, "milestone")
+        self.assertEqual(CampaignQuestUnlockMode.IMMEDIATE, "immediate")
         self.assertEqual(CreationSource.AI, "ai")
         self.assertEqual(TargetUnit.MINUTES, "minutes")
         self.assertEqual(HabitFrequency.WEEKLY, "weekly")
@@ -458,6 +488,625 @@ class QuestApiTests(TestCase):
             response.json()["error"]["code"],
             "quest_already_completed",
         )
+
+
+class CampaignServiceTests(TestCase):
+    def setUp(self) -> None:
+        self.skill = Skill.objects.create(name="Programming")
+        self.quest_a = self._quest("Define skills", 10)
+        self.quest_b = self._quest("Add activity definitions", 20)
+        self.quest_c = self._quest("Complete MVP review", 30)
+        self.campaign = create_campaign(
+            title="Life RPG MVP Arc",
+            difficulty=CampaignDifficulty.EPIC,
+            reward_xp=100,
+            reward_skill_id=self.skill.id,
+        )
+        self.node_a = add_quest_to_campaign(
+            campaign=self.campaign,
+            quest=self.quest_a,
+            stage="Foundation",
+            order=10,
+            unlock_mode=CampaignQuestUnlockMode.IMMEDIATE,
+            map_x=10,
+            map_y=20,
+        )
+        self.node_b = add_quest_to_campaign(
+            campaign=self.campaign,
+            quest=self.quest_b,
+            stage="Foundation",
+            order=20,
+            map_x=50,
+            map_y=20,
+        )
+        self.node_c = add_quest_to_campaign(
+            campaign=self.campaign,
+            quest=self.quest_c,
+            stage="Finish",
+            order=30,
+            map_x=90,
+            map_y=20,
+        )
+        set_campaign_dependencies(
+            campaign=self.campaign,
+            dependencies=[
+                {
+                    "campaign_quest_id": self.node_b.id,
+                    "depends_on_id": self.node_a.id,
+                },
+                {
+                    "campaign_quest_id": self.node_c.id,
+                    "depends_on_id": self.node_b.id,
+                },
+            ],
+        )
+
+    def _quest(self, title: str, reward_xp: int) -> Quest:
+        quest = Quest.objects.create(
+            title=title,
+            quest_type=QuestType.ONE_TIME,
+            target_value=1,
+            target_unit=TargetUnit.CHECK,
+        )
+        QuestReward.objects.create(
+            quest=quest,
+            skill=self.skill,
+            xp_amount=reward_xp,
+        )
+        return quest
+
+    def _node_state(self, campaign: Campaign, node: CampaignQuest) -> str:
+        detail = get_campaign_detail(campaign)
+        nodes = {row["id"]: row for row in detail["map"]["nodes"]}
+        return nodes[node.id]["state"]
+
+    def test_dependency_model_rejects_cross_campaign_edges(self) -> None:
+        other_campaign = create_campaign(title="Other")
+        other_node = add_quest_to_campaign(
+            campaign=other_campaign,
+            quest_title="Other quest",
+            stage="Other",
+        )
+        dependency = CampaignQuestDependency(
+            campaign_quest=self.node_a,
+            depends_on=other_node,
+        )
+
+        with self.assertRaises(ValidationError):
+            dependency.full_clean()
+
+    def test_cycle_detection_rejects_invalid_graph(self) -> None:
+        with self.assertRaises(RpgValidationError):
+            set_campaign_dependencies(
+                campaign=self.campaign,
+                dependencies=[
+                    {
+                        "campaign_quest_id": self.node_b.id,
+                        "depends_on_id": self.node_a.id,
+                    },
+                    {
+                        "campaign_quest_id": self.node_a.id,
+                        "depends_on_id": self.node_b.id,
+                    },
+                ],
+            )
+
+    def test_campaign_studio_serializes_nodes_edges_and_validation(self) -> None:
+        studio = serialize_campaign_studio(self.campaign)
+        nodes_by_id = {node["id"]: node for node in studio["nodes"]}
+
+        self.assertEqual(studio["campaign"]["id"], self.campaign.id)
+        self.assertEqual(nodes_by_id[self.node_a.id]["node_kind"], CampaignNodeKind.QUEST)
+        self.assertEqual(nodes_by_id[self.node_a.id]["position"], {"x": 10, "y": 20})
+        self.assertEqual(studio["edges"][0]["source_node_id"], self.node_a.id)
+        self.assertEqual(studio["edges"][0]["target_node_id"], self.node_b.id)
+        self.assertTrue(studio["validation"]["valid"])
+        self.assertIn(
+            {"value": "milestone", "label": "Milestone"},
+            studio["available_node_types"],
+        )
+
+    def test_campaign_node_services_create_update_position_and_delete_edges(self) -> None:
+        node = create_campaign_node(
+            campaign=self.campaign,
+            node_kind=CampaignNodeKind.MILESTONE,
+            title="Review milestone",
+            config={"summary_prompt": "What changed?"},
+            map_x=120,
+            map_y=160,
+        )
+
+        self.assertEqual(node.node_kind, CampaignNodeKind.MILESTONE)
+        self.assertEqual(node.config["summary_prompt"], "What changed?")
+
+        updated = update_campaign_node(
+            campaign=self.campaign,
+            node_id=node.id,
+            updates={
+                "title": "Updated milestone",
+                "position": {"x": 240, "y": 260},
+                "config": {"summary_prompt": "What improved?"},
+            },
+        )
+
+        self.assertEqual(updated.quest.title, "Updated milestone")
+        self.assertEqual(updated.map_x, 240)
+        self.assertEqual(updated.config["summary_prompt"], "What improved?")
+
+        edge = create_campaign_edge(
+            campaign=self.campaign,
+            source_node_id=self.node_c.id,
+            target_node_id=node.id,
+        )
+        self.assertEqual(edge.depends_on_id, self.node_c.id)
+
+        delete_campaign_node(campaign=self.campaign, node_id=node.id)
+
+        self.assertFalse(CampaignQuest.objects.filter(pk=node.id).exists())
+        self.assertFalse(CampaignQuestDependency.objects.filter(pk=edge.id).exists())
+
+    def test_position_updates_are_allowed_for_active_campaigns(self) -> None:
+        activate_campaign(campaign=self.campaign)
+
+        nodes = bulk_update_campaign_node_positions(
+            campaign=self.campaign,
+            positions=[
+                {
+                    "node_id": self.node_a.id,
+                    "position": {"x": 300, "y": 80},
+                }
+            ],
+        )
+
+        updated_by_id = {node.id: node for node in nodes}
+        self.assertEqual(updated_by_id[self.node_a.id].map_x, 300)
+        self.assertEqual(updated_by_id[self.node_a.id].map_y, 80)
+
+    def test_validate_campaign_studio_reports_empty_campaign_as_invalid(self) -> None:
+        empty_campaign = create_campaign(title="Empty")
+
+        validation = validate_campaign_studio(empty_campaign)
+
+        self.assertFalse(validation["valid"])
+        self.assertIn(
+            "missing_nodes",
+            {issue["code"] for issue in validation["issues"]},
+        )
+
+    def test_activation_and_availability_follow_dependencies(self) -> None:
+        activated = activate_campaign(campaign=self.campaign)
+
+        self.assertEqual(activated.status, CampaignStatus.ACTIVE)
+        self.assertEqual(self._node_state(activated, self.node_a), "available")
+        self.assertEqual(self._node_state(activated, self.node_b), "locked")
+
+        complete_quest(quest=self.quest_a, completed_on=date(2026, 6, 10))
+
+        self.assertEqual(self._node_state(activated, self.node_a), "completed")
+        self.assertEqual(self._node_state(activated, self.node_b), "available")
+
+    def test_completing_all_required_quests_completes_campaign_and_awards_xp_once(self) -> None:
+        achievement = Achievement.objects.create(
+            code="campaign-finished",
+            title="Campaign Finished",
+            trigger_type=AchievementTrigger.CAMPAIGN_COMPLETED,
+            trigger_config={"campaign_id": self.campaign.id},
+        )
+        activate_campaign(campaign=self.campaign)
+
+        complete_quest(quest=self.quest_a, completed_on=date(2026, 6, 10))
+        complete_quest(quest=self.quest_b, completed_on=date(2026, 6, 10))
+        complete_quest(quest=self.quest_c, completed_on=date(2026, 6, 10))
+        completed_campaign = Campaign.objects.get(pk=self.campaign.id)
+        complete_campaign_if_ready(campaign=completed_campaign)
+
+        self.assertEqual(completed_campaign.status, CampaignStatus.COMPLETED)
+        self.assertIsNotNone(completed_campaign.completed_at)
+        self.assertIsNotNone(completed_campaign.xp_awarded_at)
+        self.assertEqual(
+            XpEvent.objects.filter(source_type="campaign").count(),
+            1,
+        )
+        self.assertEqual(
+            XpEvent.objects.filter(source_type="campaign").get().amount,
+            100,
+        )
+        self.assertEqual(
+            JournalEntry.objects.filter(source_type="campaign", source_id=self.campaign.id).count(),
+            1,
+        )
+        unlock = AchievementUnlock.objects.get(achievement=achievement)
+        self.assertEqual(unlock.source_type, "campaign_completion")
+        self.assertEqual(unlock.source_id, self.campaign.id)
+
+    def test_generate_campaign_draft_creates_ai_draft_without_activation(self) -> None:
+        draft = generate_campaign_draft(
+            goal="Learn Django",
+            timeframe_days=14,
+            available_minutes_per_day=45,
+            skill_ids=[self.skill.id],
+            difficulty=CampaignDifficulty.NORMAL,
+        )
+
+        self.assertEqual(draft.status, CampaignStatus.DRAFT)
+        self.assertEqual(draft.created_by, CampaignCreatedBy.AI)
+        self.assertEqual(CampaignQuest.objects.filter(campaign=draft).count(), 3)
+        self.assertFalse(
+            CampaignQuest.objects.filter(campaign=draft, quest__status=QuestStatus.ACTIVE).exists()
+        )
+        self.assertTrue(
+            JournalEntry.objects.filter(
+                source_type="campaign_ai_draft",
+                source_id=draft.id,
+            ).exists()
+        )
+
+
+class CampaignApiTests(TestCase):
+    def setUp(self) -> None:
+        self.skill = Skill.objects.create(name="Learning")
+
+    def test_campaign_create_detail_and_activate_endpoints_return_map(self) -> None:
+        create_response = self.client.post(
+            reverse("rpg:campaigns"),
+            data=json.dumps(
+                {
+                    "title": "Django Foundations",
+                    "difficulty": "normal",
+                    "reward_xp": 100,
+                    "reward_skill_id": self.skill.id,
+                    "quests": [
+                        {
+                            "title": "Prepare project",
+                            "stage": "Setup",
+                            "unlock_mode": "immediate",
+                            "reward_skill_id": self.skill.id,
+                            "reward_xp": 25,
+                            "map_x": 20,
+                            "map_y": 30,
+                        }
+                    ],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        campaign_id = create_response.json()["campaign"]["id"]
+        self.assertEqual(create_response.json()["campaign"]["status"], "draft")
+        self.assertEqual(len(create_response.json()["campaign"]["map"]["nodes"]), 1)
+
+        detail_response = self.client.get(
+            reverse("rpg:campaign_detail", args=[campaign_id])
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(
+            detail_response.json()["campaign"]["map"]["nodes"][0]["state"],
+            "locked",
+        )
+
+        activate_response = self.client.post(
+            reverse("rpg:campaign_activate", args=[campaign_id]),
+            data=json.dumps({}),
+            content_type="application/json",
+        )
+        self.assertEqual(activate_response.status_code, 200)
+        self.assertEqual(activate_response.json()["campaign"]["status"], "active")
+        self.assertEqual(
+            activate_response.json()["campaign"]["map"]["nodes"][0]["state"],
+            "available",
+        )
+
+        list_response = self.client.get(reverse("rpg:campaigns"))
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["campaigns"][0]["title"], "Django Foundations")
+
+    def test_campaign_dependencies_endpoint_rejects_cycles(self) -> None:
+        campaign = create_campaign(title="Cycle test")
+        node_a = add_quest_to_campaign(
+            campaign=campaign,
+            quest_title="A",
+            unlock_mode=CampaignQuestUnlockMode.IMMEDIATE,
+        )
+        node_b = add_quest_to_campaign(campaign=campaign, quest_title="B")
+
+        response = self.client.post(
+            reverse("rpg:campaign_dependencies", args=[campaign.id]),
+            data=json.dumps(
+                {
+                    "dependencies": [
+                        {
+                            "campaign_quest_id": node_b.id,
+                            "depends_on_id": node_a.id,
+                        },
+                        {
+                            "campaign_quest_id": node_a.id,
+                            "depends_on_id": node_b.id,
+                        },
+                    ]
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+
+    def test_campaign_studio_endpoint_returns_canvas_contract(self) -> None:
+        campaign = create_campaign(title="Studio contract")
+        node = create_campaign_node(
+            campaign=campaign,
+            title="Start here",
+            unlock_mode=CampaignQuestUnlockMode.IMMEDIATE,
+            reward_skill_id=self.skill.id,
+            reward_xp=15,
+            map_x=40,
+            map_y=80,
+        )
+
+        response = self.client.get(reverse("rpg:campaign_studio", args=[campaign.id]))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["campaign"]["id"], campaign.id)
+        self.assertEqual(payload["nodes"][0]["id"], node.id)
+        self.assertEqual(payload["nodes"][0]["position"], {"x": 40, "y": 80})
+        self.assertEqual(payload["nodes"][0]["reward_xp"], 15)
+        self.assertEqual(payload["edges"], [])
+        self.assertTrue(payload["validation"]["valid"])
+
+    def test_campaign_node_and_edge_endpoints_create_update_and_delete(self) -> None:
+        campaign = create_campaign(title="Canvas CRUD")
+        first_response = self.client.post(
+            reverse("rpg:campaign_nodes", args=[campaign.id]),
+            data=json.dumps(
+                {
+                    "title": "Start",
+                    "unlock_mode": "immediate",
+                    "position": {"x": 20, "y": 30},
+                    "reward_skill_id": self.skill.id,
+                    "reward_xp": 10,
+                }
+            ),
+            content_type="application/json",
+        )
+        second_response = self.client.post(
+            reverse("rpg:campaign_nodes", args=[campaign.id]),
+            data=json.dumps(
+                {
+                    "node_kind": "milestone",
+                    "title": "Milestone",
+                    "position": {"x": 220, "y": 30},
+                    "config": {"tone": "reflective"},
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(second_response.status_code, 201)
+        first_id = first_response.json()["node"]["id"]
+        second_id = second_response.json()["node"]["id"]
+        self.assertEqual(second_response.json()["node"]["node_kind"], "milestone")
+        self.assertEqual(second_response.json()["node"]["config"]["tone"], "reflective")
+
+        edge_response = self.client.post(
+            reverse("rpg:campaign_edges", args=[campaign.id]),
+            data=json.dumps(
+                {
+                    "source_node_id": first_id,
+                    "target_node_id": second_id,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(edge_response.status_code, 201)
+        edge_id = edge_response.json()["edge"]["id"]
+        self.assertEqual(edge_response.json()["edge"]["source_node_id"], first_id)
+        self.assertEqual(edge_response.json()["edge"]["target_node_id"], second_id)
+
+        update_response = self.client.patch(
+            reverse("rpg:campaign_node_detail", args=[campaign.id, second_id]),
+            data=json.dumps(
+                {
+                    "title": "Updated milestone",
+                    "position": {"x": 260, "y": 90},
+                    "config": {"tone": "direct"},
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.json()["node"]["title"], "Updated milestone")
+        self.assertEqual(update_response.json()["node"]["position"], {"x": 260, "y": 90})
+        self.assertEqual(update_response.json()["node"]["config"]["tone"], "direct")
+
+        delete_edge_response = self.client.delete(
+            reverse("rpg:campaign_edge_detail", args=[campaign.id, edge_id]),
+        )
+
+        self.assertEqual(delete_edge_response.status_code, 200)
+        self.assertFalse(CampaignQuestDependency.objects.filter(pk=edge_id).exists())
+
+        delete_node_response = self.client.delete(
+            reverse("rpg:campaign_node_detail", args=[campaign.id, second_id]),
+        )
+
+        self.assertEqual(delete_node_response.status_code, 200)
+        self.assertFalse(CampaignQuest.objects.filter(pk=second_id).exists())
+
+    def test_campaign_edges_endpoint_rejects_cycle(self) -> None:
+        campaign = create_campaign(title="Canvas cycle")
+        node_a = create_campaign_node(
+            campaign=campaign,
+            title="A",
+            unlock_mode=CampaignQuestUnlockMode.IMMEDIATE,
+        )
+        node_b = create_campaign_node(campaign=campaign, title="B")
+        create_campaign_edge(
+            campaign=campaign,
+            source_node_id=node_a.id,
+            target_node_id=node_b.id,
+        )
+
+        response = self.client.post(
+            reverse("rpg:campaign_edges", args=[campaign.id]),
+            data=json.dumps(
+                {
+                    "source_node_id": node_b.id,
+                    "target_node_id": node_a.id,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+
+    def test_campaign_positions_endpoint_allows_active_campaign_layout_update(self) -> None:
+        campaign = create_campaign(title="Active layout")
+        node = create_campaign_node(
+            campaign=campaign,
+            title="Start",
+            unlock_mode=CampaignQuestUnlockMode.IMMEDIATE,
+        )
+        activate_campaign(campaign=campaign)
+
+        response = self.client.patch(
+            reverse("rpg:campaign_node_positions", args=[campaign.id]),
+            data=json.dumps(
+                {
+                    "positions": [
+                        {
+                            "node_id": node.id,
+                            "position": {"x": 500, "y": 140},
+                        }
+                    ]
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        node.refresh_from_db()
+        self.assertEqual(node.map_x, 500)
+        self.assertEqual(node.map_y, 140)
+
+    def test_campaign_publish_endpoint_blocks_invalid_campaign(self) -> None:
+        campaign = create_campaign(title="No nodes")
+
+        response = self.client.post(
+            reverse("rpg:campaign_publish", args=[campaign.id]),
+            data=json.dumps({}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "campaign_not_ready")
+        self.assertFalse(response.json()["validation"]["valid"])
+
+    def test_campaign_publish_endpoint_activates_valid_campaign(self) -> None:
+        campaign = create_campaign(title="Publish ready")
+        create_campaign_node(
+            campaign=campaign,
+            title="Start",
+            unlock_mode=CampaignQuestUnlockMode.IMMEDIATE,
+        )
+
+        response = self.client.post(
+            reverse("rpg:campaign_publish", args=[campaign.id]),
+            data=json.dumps({}),
+            content_type="application/json",
+        )
+
+        campaign.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["campaign"]["status"], "active")
+        self.assertEqual(campaign.status, CampaignStatus.ACTIVE)
+
+    def test_structural_node_edit_is_blocked_after_publish(self) -> None:
+        campaign = create_campaign(title="Published")
+        node = create_campaign_node(
+            campaign=campaign,
+            title="Start",
+            unlock_mode=CampaignQuestUnlockMode.IMMEDIATE,
+        )
+        activate_campaign(campaign=campaign)
+
+        response = self.client.patch(
+            reverse("rpg:campaign_node_detail", args=[campaign.id, node.id]),
+            data=json.dumps({"title": "Should fail"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+
+    def test_campaign_ai_draft_endpoint_creates_draft(self) -> None:
+        response = self.client.post(
+            reverse("rpg:campaign_ai_drafts"),
+            data=json.dumps(
+                {
+                    "goal": "Build an AI learning routine",
+                    "timeframe_days": 30,
+                    "available_minutes_per_day": 60,
+                    "skill_ids": [self.skill.id],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["campaign"]
+        self.assertEqual(payload["status"], "draft")
+        self.assertEqual(payload["created_by"], "ai")
+        self.assertEqual(len(payload["map"]["nodes"]), 3)
+
+    def test_quest_completion_endpoint_returns_completed_campaign_results(self) -> None:
+        campaign = create_campaign(
+            title="API Campaign",
+            reward_xp=50,
+            reward_skill_id=self.skill.id,
+        )
+        quest = Quest.objects.create(
+            title="Finish API campaign quest",
+            quest_type=QuestType.ONE_TIME,
+            target_value=1,
+            target_unit=TargetUnit.CHECK,
+        )
+        QuestReward.objects.create(quest=quest, skill=self.skill, xp_amount=10)
+        add_quest_to_campaign(
+            campaign=campaign,
+            quest=quest,
+            unlock_mode=CampaignQuestUnlockMode.IMMEDIATE,
+        )
+        activate_campaign(campaign=campaign)
+        Achievement.objects.create(
+            code="api-campaign-finished",
+            title="API Campaign Finished",
+            trigger_type=AchievementTrigger.CAMPAIGN_COMPLETED,
+            trigger_config={"campaign_id": campaign.id},
+        )
+
+        response = self.client.post(
+            reverse("rpg:quest_complete", args=[quest.id]),
+            data=json.dumps({"completed_on": "2026-06-10"}),
+            content_type="application/json",
+        )
+
+        payload = response.json()
+        campaign.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["dashboard_refresh_required"])
+        self.assertEqual(payload["campaign_results"][0]["campaign"]["id"], campaign.id)
+        self.assertTrue(payload["campaign_results"][0]["completed"])
+        self.assertEqual(
+            payload["campaign_results"][0]["achievement_unlocks"][0]["title"],
+            "API Campaign Finished",
+        )
+        self.assertEqual(campaign.status, CampaignStatus.COMPLETED)
 
 
 class HabitModelTests(TestCase):

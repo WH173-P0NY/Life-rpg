@@ -6,6 +6,7 @@ import { AppShell } from "./components/AppShell";
 import { AttributesPanel } from "./components/AttributesPanel";
 import { AchievementsView } from "./components/AchievementsView";
 import { CalendarView } from "./components/CalendarView";
+import { CampaignsView } from "./components/CampaignsView";
 import { ChartsPanel } from "./components/ChartsPanel";
 import { ChallengePanel } from "./components/ChallengePanel";
 import { GoalsView } from "./components/GoalsView";
@@ -27,6 +28,7 @@ type ApiState = "loading" | "ready" | "fallback";
 const themeStorageKey = "life-rpg-dashboard-theme";
 const viewIds: AppView[] = [
   "dashboard",
+  "campaigns",
   "quests",
   "habits",
   "skills",
@@ -120,6 +122,13 @@ export default function App() {
     }
 
     switch (activeView) {
+      case "campaigns":
+        return (
+          <>
+            <ViewHeader label={t("view.campaigns.label")} title={t("view.campaigns.title")} meta={t("view.campaigns.meta")} />
+            <CampaignsView isApiReady={isApiReady} onCampaignChanged={refreshDashboard} />
+          </>
+        );
       case "quests":
         return (
           <>

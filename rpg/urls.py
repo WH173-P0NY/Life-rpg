@@ -21,6 +21,77 @@ urlpatterns: list[URLPattern] = [
         views.toggle_habit_api,
         name="habit_toggle",
     ),
+    path("campaigns/", views.campaigns_api, name="campaigns"),
+    path(
+        "campaigns/ai-drafts/",
+        views.campaign_ai_drafts_api,
+        name="campaign_ai_drafts",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/",
+        views.campaign_detail_api,
+        name="campaign_detail",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/activate/",
+        views.campaign_activate_api,
+        name="campaign_activate",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/publish/",
+        views.campaign_publish_api,
+        name="campaign_publish",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/studio/",
+        views.campaign_studio_api,
+        name="campaign_studio",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/validate/",
+        views.campaign_validate_api,
+        name="campaign_validate",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/archive/",
+        views.campaign_archive_api,
+        name="campaign_archive",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/nodes/",
+        views.campaign_nodes_api,
+        name="campaign_nodes",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/nodes/positions/",
+        views.campaign_node_positions_api,
+        name="campaign_node_positions",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/nodes/<int:node_id>/",
+        views.campaign_node_detail_api,
+        name="campaign_node_detail",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/edges/",
+        views.campaign_edges_api,
+        name="campaign_edges",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/edges/<int:edge_id>/",
+        views.campaign_edge_detail_api,
+        name="campaign_edge_detail",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/quests/",
+        views.campaign_add_quest_api,
+        name="campaign_add_quest",
+    ),
+    path(
+        "campaigns/<int:campaign_id>/dependencies/",
+        views.campaign_dependencies_api,
+        name="campaign_dependencies",
+    ),
     path("goals/", views.goals_api, name="goals"),
     path("goals/<int:goal_id>/", views.goal_detail_api, name="goal_detail"),
     path(

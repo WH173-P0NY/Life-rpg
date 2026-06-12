@@ -5,6 +5,7 @@ import {
   Crown,
   Dumbbell,
   Home,
+  Map,
   Package,
   ScrollText,
   Settings,
@@ -19,6 +20,7 @@ import type { DashboardHero } from "../types/dashboard";
 
 export type AppView =
   | "dashboard"
+  | "campaigns"
   | "quests"
   | "habits"
   | "skills"
@@ -32,6 +34,7 @@ export type AppView =
 
 const navItems = [
   { id: "dashboard", labelKey: "nav.dashboard", icon: Home },
+  { id: "campaigns", labelKey: "nav.campaigns", icon: Map },
   { id: "quests", labelKey: "nav.quests", icon: CheckSquare },
   { id: "habits", labelKey: "nav.habits", icon: Target },
   { id: "skills", labelKey: "nav.skills", icon: Dumbbell },
