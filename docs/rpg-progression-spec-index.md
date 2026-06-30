@@ -22,26 +22,34 @@ activity / quest / habit / manual progress
 
 Repo nie jest juz na etapie opisanym w starszym `docs/rpg-modules-implementation-index.md`.
 
-Aktualnie istnieja:
+Aktualnie istnieja w kodzie:
 
 - aplikacja `rpg`,
 - questy,
 - habity,
 - milestone streakow,
+- goals,
+- challenges,
+- achievements,
 - Journal z `JournalEntry`,
 - `CharacterIdentity`,
-- dashboard API z realnymi questami, habitami i journalem,
+- dashboard API z realnymi questami, habitami, journalem, active challenge i
+  ostatnimi achievementami,
 - React sidebar z osobnymi widokami,
+- React widoki Goals i Achievements,
 - `planner` i widok Calendar.
 
-Do wdrozenia w tym module zostaja:
+Zakres z tego modulu jest zaimplementowany w podstawowej wersji, ale wymaga
+ponownej weryfikacji na dzialajacym PostgreSQL. Ostatnie lokalne sprawdzenie z
+2026-06-29 bylo zablokowane przez brak odpowiedzi bazy na `127.0.0.1:5432`.
 
-- Goals,
-- Challenges,
-- Achievements,
-- realne `active_challenge` w dashboardzie,
-- realne `achievements` w dashboardzie i widoku sidebar,
-- automatyczne wpisy journala dla goal/challenge/achievement.
+Do dopiecia zostaja:
+
+- uruchomic lokalny PostgreSQL i potwierdzic pelny `manage.py test`,
+- utrzymac frontend `typecheck` i `build` na zielono,
+- uporzadkowac starsze analizy/specy, ktore opisuja stan sprzed implementacji,
+- zdecydowac, czy nastepny produktowy krok to ActivityWatch stage 2, czy
+  stabilizacja RPG/UI.
 
 ## Dokumenty
 
@@ -109,6 +117,9 @@ Zakres:
 - AI quest generation jest poza tym modulem.
 
 ## Rekomendowana kolejnosc wdrozenia
+
+Ten plan opisuje pierwotna kolejnosc wdrozenia. Obecny kod zawiera juz te
+powierzchnie, wiec lista sluzy teraz jako checklist utrzymaniowy i regresyjny.
 
 1. Backend choices i modele:
    - `Goal`,

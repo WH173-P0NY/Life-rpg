@@ -598,6 +598,11 @@ class CampaignServiceTests(TestCase):
         self.assertEqual(studio["campaign"]["id"], self.campaign.id)
         self.assertEqual(nodes_by_id[self.node_a.id]["node_kind"], CampaignNodeKind.QUEST)
         self.assertEqual(nodes_by_id[self.node_a.id]["position"], {"x": 10, "y": 20})
+        self.assertEqual(nodes_by_id[self.node_a.id]["reward_skill_id"], self.skill.id)
+        self.assertEqual(
+            nodes_by_id[self.node_a.id]["reward_skill"],
+            {"id": self.skill.id, "name": self.skill.name},
+        )
         self.assertEqual(studio["edges"][0]["source_node_id"], self.node_a.id)
         self.assertEqual(studio["edges"][0]["target_node_id"], self.node_b.id)
         self.assertTrue(studio["validation"]["valid"])
@@ -852,6 +857,11 @@ class CampaignApiTests(TestCase):
         self.assertEqual(payload["nodes"][0]["id"], node.id)
         self.assertEqual(payload["nodes"][0]["position"], {"x": 40, "y": 80})
         self.assertEqual(payload["nodes"][0]["reward_xp"], 15)
+        self.assertEqual(payload["nodes"][0]["reward_skill_id"], self.skill.id)
+        self.assertEqual(
+            payload["nodes"][0]["reward_skill"],
+            {"id": self.skill.id, "name": self.skill.name},
+        )
         self.assertEqual(payload["edges"], [])
         self.assertTrue(payload["validation"]["valid"])
 
@@ -887,6 +897,11 @@ class CampaignApiTests(TestCase):
         self.assertEqual(second_response.status_code, 201)
         first_id = first_response.json()["node"]["id"]
         second_id = second_response.json()["node"]["id"]
+        self.assertEqual(first_response.json()["node"]["reward_skill_id"], self.skill.id)
+        self.assertEqual(
+            first_response.json()["node"]["reward_skill"],
+            {"id": self.skill.id, "name": self.skill.name},
+        )
         self.assertEqual(second_response.json()["node"]["node_kind"], "milestone")
         self.assertEqual(second_response.json()["node"]["config"]["tone"], "reflective")
 

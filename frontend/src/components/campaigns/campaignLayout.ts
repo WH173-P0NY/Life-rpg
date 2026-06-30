@@ -4,10 +4,12 @@ import type {
   CampaignNodePositionPayload
 } from "../../types/campaigns";
 
-const nodeWidth = 236;
-const nodeHeight = 136;
-const horizontalGap = 88;
-const verticalGap = 56;
+const nodeWidth = 136;
+const nodeHeight = 132;
+const horizontalGap = 104;
+const verticalGap = 44;
+const collisionWidth = nodeWidth + 48;
+const collisionHeight = nodeHeight + 28;
 const horizontalSpacing = nodeWidth + horizontalGap;
 const verticalSpacing = nodeHeight + verticalGap;
 const startX = 160;
@@ -242,8 +244,8 @@ function intersects(
   right: CampaignNodePositionPayload
 ): boolean {
   return (
-    Math.abs(left.x - right.x) < horizontalSpacing &&
-    Math.abs(left.y - right.y) < verticalSpacing
+    Math.abs(left.x - right.x) < collisionWidth &&
+    Math.abs(left.y - right.y) < collisionHeight
   );
 }
 

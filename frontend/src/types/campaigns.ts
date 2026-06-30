@@ -30,6 +30,7 @@ export interface CampaignMapNode {
   x: number;
   y: number;
   rewardXp: number;
+  rewardSkill: CampaignRewardSkill | null;
   targetValue: number;
   targetUnit: string;
   difficulty: string;
@@ -205,6 +206,18 @@ export interface CampaignNodePositionPayload {
   nodeId: string;
   x: number;
   y: number;
+}
+
+export interface CampaignAddNodeRequest {
+  kind: CampaignNodeKind;
+  rewardSkillId?: string;
+  rewardXp?: number;
+  sourceNodeId?: string;
+  sourceEdgeId?: string;
+  viewportPosition?: {
+    x: number;
+    y: number;
+  };
 }
 
 export interface CampaignEdgePayload {

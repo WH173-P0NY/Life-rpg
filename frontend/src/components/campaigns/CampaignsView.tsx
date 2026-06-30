@@ -20,6 +20,7 @@ import { fetchAppSettings, type SettingsSkill } from "../../api/settings";
 import { useI18n } from "../../i18n";
 import type {
   Campaign,
+  CampaignAddNodeRequest,
   CampaignNodeKind,
   CampaignNodePositionPayload,
   CampaignNodeUpdatePayload,
@@ -142,31 +143,62 @@ export function CampaignsView({ isApiReady, onCampaignChanged }: CampaignsViewPr
     void loadCampaignStudio(campaignId);
   }
 
-  async function handleAddNode(kind: CampaignNodeKind) {
+  async function handleAddNode(request: CampaignAddNodeRequest) {
     if (!studio) {
       return;
     }
     await runStudioAction("add-node", async () => {
       const nodeCount = studio.nodes.length;
-      const position = findOpenCampaignNodePosition(studio.nodes, {
-        x: 160 + nodeCount * 80,
-        y: 120
-      });
+      const sourceNodeId =
+        request.sourceNodeId ??
+        studio.edges.find((edge) => edge.id === request.sourceEdgeId)?.sourceNodeId;
+      const sourceNode = studio.nodes.find((node) => node.id === sourceNodeId);
+      const position = findOpenCampaignNodePosition(
+        studio.nodes,
+        request.viewportPosition ??
+          (sourceNode
+            ? {
+                x: sourceNode.position.x + 260,
+                y: sourceNode.position.y
+              }
+            : {
+                x: 160 + nodeCount * 80,
+                y: 120
+              })
+      );
 
-      await createCampaignNode(studio.campaign.id, {
-        nodeKind: kind,
-        title: t(`campaigns.node.${kind}`),
+      const response = await createCampaignNode(studio.campaign.id, {
+        nodeKind: request.kind,
+        title: t(`campaigns.node.${request.kind}`),
         description: "",
         stage: t("campaigns.studio.defaultStage"),
-        isRequired: kind !== "reward",
+        isRequired: request.kind !== "reward",
         unlockMode: nodeCount ? "after_dependencies" : "immediate",
         position,
-        rewardXp: kind === "quest" ? 25 : 0,
+        rewardSkillId: request.rewardSkillId,
+        rewardXp: request.rewardXp ?? 0,
         targetValue: 1,
         targetUnit: "check",
         difficulty: "normal",
         config: {}
       });
+
+      if (sourceNodeId) {
+        if (!response.node) {
+          await refreshCampaigns(studio.campaign.id);
+          throw new Error(t("campaigns.studio.addNodeConnectionFailed"));
+        }
+        try {
+          await createCampaignEdge(studio.campaign.id, {
+            sourceNodeId,
+            targetNodeId: response.node.id
+          });
+        } catch (error) {
+          await refreshCampaigns(studio.campaign.id);
+          throw error;
+        }
+      }
+
       await refreshCampaigns(studio.campaign.id);
     });
   }

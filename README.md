@@ -9,6 +9,9 @@ PostgreSQL as the source of truth, explicit domain services for XP/progression,
 and a React dashboard served either through Vite during development or through
 Django after a frontend build.
 
+Current implementation status and known blockers are tracked in
+[`docs/current-project-status.md`](docs/current-project-status.md).
+
 ## Stack
 
 ### Backend
@@ -106,10 +109,14 @@ python manage.py runserver 127.0.0.1:8000
 Useful backend checks:
 
 ```bash
-python manage.py check
-python manage.py makemigrations --check --dry-run
-python manage.py test
+.venv/bin/python manage.py check
+.venv/bin/python manage.py makemigrations --check --dry-run
+.venv/bin/python manage.py test
 ```
+
+Use `.venv/bin/python` explicitly when the virtual environment is not activated.
+The app requires `psycopg`, so backend checks will fail on a system interpreter
+that does not have the PostgreSQL driver installed.
 
 ## Frontend Setup
 

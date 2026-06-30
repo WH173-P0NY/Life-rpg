@@ -89,6 +89,7 @@ def serialize_campaign_studio_node(
             node.id,
             "locked",
         )
+    reward_skill = _quest_reward_skill_payload(node.quest)
     return {
         "id": node.id,
         "node_kind": node.node_kind,
@@ -107,6 +108,8 @@ def serialize_campaign_studio_node(
         "map_x": node.map_x,
         "map_y": node.map_y,
         "reward_xp": node.quest.reward_xp_total(),
+        "reward_skill_id": reward_skill["id"] if reward_skill else None,
+        "reward_skill": reward_skill,
         "target_value": node.quest.target_value,
         "target_unit": node.quest.target_unit,
         "quest_type": node.quest.quest_type,
@@ -1020,28 +1023,9 @@ def get_campaign_progress(campaign: Campaign) -> dict[str, int]:
 def build_campaign_map(campaign: Campaign) -> dict[str, Any]:
     nodes = list(_campaign_quest_queryset(campaign))
     states = _campaign_quest_states(campaign, nodes)
-    reward_totals = {
-        node.quest_id: node.quest.reward_xp_total()
-        for node in nodes
-    }
     return {
         "nodes": [
-            {
-                "id": node.id,
-                "quest_id": node.quest_id,
-                "title": node.quest.title,
-                "description": node.quest.description,
-                "stage": node.stage,
-                "state": states[node.id],
-                "is_required": node.is_required,
-                "unlock_mode": node.unlock_mode,
-                "map_x": node.map_x,
-                "map_y": node.map_y,
-                "reward_xp": reward_totals.get(node.quest_id, 0),
-                "target_value": node.quest.target_value,
-                "target_unit": node.quest.target_unit,
-                "difficulty": node.quest.difficulty,
-            }
+            _serialize_campaign_map_node(node, state=states[node.id])
             for node in nodes
         ],
         "edges": [
@@ -1054,6 +1038,32 @@ def build_campaign_map(campaign: Campaign) -> dict[str, Any]:
                 campaign_quest__campaign=campaign
             ).order_by("depends_on__order", "campaign_quest__order", "id")
         ],
+    }
+
+
+def _serialize_campaign_map_node(
+    node: CampaignQuest,
+    *,
+    state: str,
+) -> dict[str, Any]:
+    reward_skill = _quest_reward_skill_payload(node.quest)
+    return {
+        "id": node.id,
+        "quest_id": node.quest_id,
+        "title": node.quest.title,
+        "description": node.quest.description,
+        "stage": node.stage,
+        "state": state,
+        "is_required": node.is_required,
+        "unlock_mode": node.unlock_mode,
+        "map_x": node.map_x,
+        "map_y": node.map_y,
+        "reward_xp": node.quest.reward_xp_total(),
+        "reward_skill_id": reward_skill["id"] if reward_skill else None,
+        "reward_skill": reward_skill,
+        "target_value": node.quest.target_value,
+        "target_unit": node.quest.target_unit,
+        "difficulty": node.quest.difficulty,
     }
 
 
@@ -1125,6 +1135,16 @@ def _normalize_node_kind(node_kind: str) -> str:
     if clean_kind not in valid_kinds:
         raise RpgValidationError("Unsupported campaign node kind.")
     return clean_kind
+
+
+def _quest_reward_skill_payload(quest: Quest) -> dict[str, Any] | None:
+    reward = next(iter(quest.rewards.all()), None)
+    if reward is None:
+        return None
+    return {
+        "id": reward.skill_id,
+        "name": reward.skill.name,
+    }
 
 
 def _normalize_config(config: dict[str, Any] | None) -> dict[str, Any]:

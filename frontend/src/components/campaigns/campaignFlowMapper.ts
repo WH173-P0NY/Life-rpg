@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 
 import type {
+  CampaignAddNodeRequest,
   CampaignStudioEdge,
   CampaignStudioMode,
   CampaignStudioNode
@@ -14,6 +15,7 @@ import {
 export interface CampaignFlowNodeData extends Record<string, unknown> {
   node: CampaignStudioNode;
   mode: CampaignStudioMode;
+  onAddNodeRequest?: (context: Omit<CampaignAddNodeRequest, "kind">) => void;
   t: (key: TranslationKey) => string;
 }
 
@@ -23,7 +25,8 @@ export type CampaignFlowEdge = Edge<{ edge: CampaignStudioEdge }>;
 export function toFlowNodes(
   nodes: CampaignStudioNode[],
   mode: CampaignStudioMode,
-  t: (key: TranslationKey) => string
+  t: (key: TranslationKey) => string,
+  onAddNodeRequest?: (context: Omit<CampaignAddNodeRequest, "kind">) => void
 ): CampaignFlowNode[] {
   const positions = new Map(
     resolveCampaignNodeCollisions(nodes.map(getCampaignNodePosition)).map((position) => [
@@ -42,6 +45,7 @@ export function toFlowNodes(
     data: {
       node,
       mode,
+      onAddNodeRequest,
       t
     },
     draggable: mode === "builder",

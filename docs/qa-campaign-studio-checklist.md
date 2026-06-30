@@ -1,41 +1,72 @@
-# Campaign Studio QA Checklist
+# Campaign Studio Canvas-First QA Checklist
 
-Ten dokument jest reczna lista kontroli dla przebudowy `Campaigns` na Campaign Studio w stylu workflow/n8n.
+Ten dokument jest reczna lista kontroli dla przebudowy `Campaigns` na Campaign
+Studio w stylu Make/n8n. Obowiazujacy UX contract znajduje sie w
+`docs/campaign-studio-workflow-canvas-redesign-spec.md`.
 
 ## Cel QA
 
-- Upewnic sie, ze kampanie tworzy sie wizualnie na canvasie, a nie przez zestaw luznych formularzy.
+- Upewnic sie, ze kampanie tworzy sie na canvasie jako workflow graph.
+- Sprawdzic, ze domyslny widok nie pokazuje stalej biblioteki, palety,
+  inspectora ani readiness panelu.
 - Sprawdzic, ze backend zapisuje strukture grafu i odtwarza ja po odswiezeniu.
-- Sprawdzic, ze PL/EN sa kompletne, a widoczny copy nie jest hardcoded w komponentach.
+- Sprawdzic, ze PL/EN sa kompletne, a widoczny copy nie jest hardcoded w
+  komponentach.
 
 ## Smoke
 
 - [ ] `Campaigns` otwiera sie bez bledu przy dzialajacym Django API.
 - [ ] Empty state pokazuje CTA do utworzenia pierwszej kampanii.
-- [ ] Lista kampanii pozwala wybrac draft, active, completed i archived.
+- [ ] Campaign switcher pozwala wyszukac i wybrac draft, active, completed i archived.
 - [ ] Po odswiezeniu strony wybrana kampania laduje realne node'y i edge'e z API.
 - [ ] Bledy API sa widoczne jako czytelny komunikat, nie jako surowy traceback albo pusty alert.
+
+## Canvas-First Layout
+
+- [ ] Desktop pokazuje top bar i canvas jako glowna powierzchnie pracy.
+- [ ] Domyslnie nie ma stalego lewego panelu biblioteki.
+- [ ] Domyslnie nie ma stalej palety node'ow.
+- [ ] Domyslnie nie ma stalego prawego inspectora.
+- [ ] Domyslnie nie ma stalego readiness panelu.
+- [ ] Canvas zajmuje wiekszosc workbench viewportu.
+- [ ] Campaign switcher otwiera sie jako popover/sheet i zamyka po wyborze.
+- [ ] Node picker otwiera sie tylko po akcji dodawania node'a.
+- [ ] Validation details otwieraja sie tylko po kliknieciu statusu, Validate albo zablokowanym Publish.
 
 ## Canvas
 
 - [ ] Canvas ma staly wymiar rodzica i nie zapada sie do zera.
 - [ ] Pan dziala mysza lub trackpadem.
 - [ ] Zoom in/out dziala i nie rozbija layoutu.
-- [ ] Node mozna przesunac drag & drop.
-- [ ] Po drag stop pozycja zapisuje sie w backendzie.
+- [ ] Node mozna przesunac drag & drop w builder mode.
+- [ ] Po drag stop pozycja zapisuje sie w backendzie przez `PATCH /nodes/positions/`.
 - [ ] Po odswiezeniu strony node zostaje w zapisanej pozycji.
-- [ ] Node'y nie nachodza na toolbar, palete ani inspector.
 - [ ] Minimap/controls nie zaslaniaja istotnych akcji.
+- [ ] Hover controls nie zmieniaja rozmiaru node'a i nie przesuwaja grafu.
+
+## Overlap And Geometry
+
+- [ ] Node'y nie nachodza na siebie po initial load.
+- [ ] Node'y nie nachodza na siebie po dodaniu node'a.
+- [ ] Node'y nie nachodza na siebie po auto-layout.
+- [ ] Node'y nie nachodza na siebie po drag-stop.
+- [ ] Hover controls, status badges, XP badges i selected ring nie powoduja overlapu.
+- [ ] Sprawdzone dla 3 node'ow.
+- [ ] Sprawdzone dla 10 node'ow.
+- [ ] Sprawdzone dla 30 node'ow.
 
 ## Node Creation
 
-- [ ] Paleta pozwala dodac node typu Quest.
-- [ ] Paleta pozwala dodac node typu Milestone.
-- [ ] Paleta pozwala dodac node typu Reward.
-- [ ] Paleta pozwala dodac node typu Reflection.
-- [ ] Paleta pozwala dodac node typu Gate.
-- [ ] Nowy node pojawia sie na canvasie i od razu zostaje zaznaczony.
-- [ ] Nowy node otwiera inspector.
+- [ ] Plus na output connectorze otwiera node picker.
+- [ ] Node picker pozwala dodac node typu Quest.
+- [ ] Node picker pozwala dodac node typu Milestone.
+- [ ] Node picker pozwala dodac node typu Reward.
+- [ ] Node picker pozwala dodac node typu Reflection.
+- [ ] Node picker pozwala dodac node typu Gate.
+- [ ] Add from node tworzy nowy node i edge od source node do nowego node'a.
+- [ ] Add from empty canvas tworzy node bez edge'a w okolicy viewport center.
+- [ ] Add from branch placeholder w first pass dziala jako add-after-source, bez splicowania edge'a.
+- [ ] Gdy create-edge po create-node sie nie powiedzie, UI odswieza studio state i pokazuje blad.
 - [ ] Nowy node zapisuje sie w backendzie.
 - [ ] Po odswiezeniu nowy node nadal istnieje.
 
@@ -49,21 +80,25 @@ Ten dokument jest reczna lista kontroli dla przebudowy `Campaigns` na Campaign S
 - [ ] Proba utworzenia cyklu pokazuje czytelny blad i nie zapisuje edge'a.
 - [ ] Usuniecie edge'a usuwa dependency w backendzie.
 - [ ] Po odswiezeniu usuniety edge nie wraca.
+- [ ] Edge label/route summary jest read-only i derivowany z istniejacych danych.
 
-## Inspector
+## Inspector Drawers
 
-- [ ] Klikniecie node'a otwiera prawy inspector.
-- [ ] Klikniecie tla canvasu czysci selection albo pokazuje neutralny empty state.
-- [ ] Inspector opisuje, czym jest dany typ node'a.
-- [ ] Inspector pozwala zapisac tytul.
-- [ ] Inspector pozwala zapisac opis.
-- [ ] Inspector pozwala zapisac stage.
-- [ ] Inspector pozwala ustawic required/optional.
-- [ ] Inspector pozwala ustawic reward XP.
-- [ ] Inspector pozwala wybrac reward skill.
-- [ ] Inspector pozwala wybrac unlock mode.
+- [ ] Klikniecie node'a otwiera `NodeInspectorDrawer`.
+- [ ] Klikniecie edge'a otwiera `EdgeInspectorDrawer`.
+- [ ] Klikniecie tla canvasu zamyka tylko clean drawer.
+- [ ] `Esc` zamyka tylko clean drawer.
+- [ ] Dirty drawer wymaga explicit Save albo Discard.
+- [ ] Node drawer pozwala zapisac tytul.
+- [ ] Node drawer pozwala zapisac opis.
+- [ ] Node drawer pozwala zapisac stage.
+- [ ] Node drawer pozwala ustawic required/optional.
+- [ ] Node drawer pozwala ustawic reward XP i reward skill.
+- [ ] Add quest z node pickera pozwala wybrac reward skill i XP przed utworzeniem node'a.
+- [ ] Save node nie wysyla pustego `rewardSkillId` i nie czysci istniejacego reward skill, chyba ze uzytkownik ustawi XP na `0`.
+- [ ] Node drawer pozwala wybrac unlock mode.
 - [ ] Save nie tworzy duplikatu questa.
-- [ ] Bledy walidacji sa pokazane przy formularzu albo w panelu errorow.
+- [ ] Bledy walidacji sa pokazane przy formularzu albo w drawerze errorow.
 
 ## Delete
 
@@ -86,12 +121,14 @@ Ten dokument jest reczna lista kontroli dla przebudowy `Campaigns` na Campaign S
 
 ## Validation And Publish
 
+- [ ] Top bar pokazuje status: Ready, Needs work albo Draft.
 - [ ] Validate wykrywa brak startu.
 - [ ] Validate wykrywa brak questow.
 - [ ] Validate wykrywa cykle.
 - [ ] Validate wykrywa nieosiagalne required node'y.
 - [ ] Validate wykrywa brak finalnego node'a, jezeli final node jest wymagany w danym etapie.
-- [ ] Readiness panel pokazuje checkliste, a nie tylko ogolny blad.
+- [ ] Validation drawer pokazuje checkliste, a nie tylko ogolny blad.
+- [ ] Klikniecie issue wybiera albo centruje powiazany node/edge, jezeli payload ma id.
 - [ ] Publish/activate jest zablokowany, gdy walidacja ma bledy.
 - [ ] Publish/activate pokazuje konkretne powody blokady.
 - [ ] Udany publish/activate zmienia status kampanii i odswieza widok.
@@ -113,15 +150,17 @@ Ten dokument jest reczna lista kontroli dla przebudowy `Campaigns` na Campaign S
 
 - [ ] AI draft tworzy edytowalna mape, nie ukryty formularz.
 - [ ] AI draft nie aktywuje kampanii automatycznie.
-- [ ] Akcje AI pokazuje jasny pending state.
+- [ ] Akcje AI pokazuja jasny pending state.
 - [ ] Blad AI pokazuje czytelny komunikat.
 - [ ] Draft AI mozna poprawic recznie przed publikacja.
 
 ## Responsive
 
-- [ ] Desktop: lewy panel, canvas i inspector mieszcza sie bez poziomego scrolla strony.
-- [ ] Tablet: inspector nie zaslania canvasu.
-- [ ] Mobile: widok ma sensowny tryb przelaczania miedzy lista/canvas/inspector.
+- [ ] Desktop: top bar i canvas mieszcza sie bez poziomego scrolla strony.
+- [ ] Tablet: inspector drawer nie zaslania trwale calego canvasu.
+- [ ] Mobile: canvas jest pierwszym ekranem.
+- [ ] Mobile: inspector i validation sa bottom sheets.
+- [ ] Mobile: node picker jest sheet albo full-screen command surface.
 - [ ] Teksty w przyciskach nie wychodza poza kontenery w PL i EN.
 - [ ] Canvas nie zaslania sidebaru ani topbara.
 
@@ -144,6 +183,7 @@ Ten dokument jest reczna lista kontroli dla przebudowy `Campaigns` na Campaign S
 - [ ] Backend nie pozwala edytowac struktury zakonczonej albo zarchiwizowanej kampanii.
 - [ ] Zapis pozycji node'a jest debounce'owany lub wykonywany na drag stop, nie przy kazdym pikselu.
 - [ ] Usuniecie node'a nie zostawia wiszacych edge'ow.
+- [ ] Duplicate node nie jest widoczny w first pass, chyba ze osobny kontrakt okresla kopiowanie edge'y, pozycji i reward skill.
 - [ ] React build nie ma brakujacych importow CSS React Flow.
 - [ ] Duzy bundle Vite jest tylko warningiem, nie blokada.
 
@@ -159,24 +199,22 @@ Backend:
 Frontend:
 
 ```bash
-cd frontend
-npm run build
+npm --prefix frontend run typecheck
+npm --prefix frontend run build
 ```
 
 Manual smoke with API:
 
 ```bash
 .venv/bin/python manage.py runserver 127.0.0.1:8000
-cd frontend
-npm run dev
+npm --prefix frontend run dev
 ```
 
 ## Acceptance
 
-- [ ] Uzytkownik moze stworzyc kampanie wizualnie.
-- [ ] Node'y da sie przesuwac, laczyc, usuwac i edytowac.
+- [ ] Uzytkownik moze stworzyc kampanie wizualnie na canvasie.
+- [ ] Node'y da sie przesuwac, laczyc, usuwac i edytowac przez drawers/popovers.
 - [ ] Po refreshu struktura kampanii zostaje zachowana.
 - [ ] Play Mode pokazuje realny progres bez edycji struktury.
 - [ ] Validate/Publish jasno tlumaczy, co trzeba poprawic.
-- [ ] PL/EN sa kompletne dla nowych widocznych tekstow.
-- [ ] Backend tests i frontend build przechodza.
+- [ ] Canvas-first layout nie wraca do stalego ukladu: library + palette + canvas + inspector.

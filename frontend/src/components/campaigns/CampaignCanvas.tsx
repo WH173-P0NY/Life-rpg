@@ -10,12 +10,14 @@ import {
   type Connection,
   type Edge,
   type Node,
-  type OnNodeDrag
+  type OnNodeDrag,
+  useReactFlow
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
 import { useI18n } from "../../i18n";
 import type {
+  CampaignAddNodeRequest,
   CampaignStudioEdge,
   CampaignStudioMode,
   CampaignStudioNode
@@ -35,6 +37,9 @@ interface CampaignCanvasProps {
   onNodeSelect: (nodeId: string | null) => void;
   onEdgeSelect: (edgeId: string | null) => void;
   onConnect: (sourceNodeId: string, targetNodeId: string) => Promise<void>;
+  onAddNodeRequest: (
+    context: Omit<CampaignAddNodeRequest, "kind">
+  ) => void;
   onNodeDragStop: (nodeId: string, position: { x: number; y: number }) => Promise<void>;
   onNodesDelete: (nodeIds: string[]) => Promise<void>;
   onEdgesDelete: (edgeIds: string[]) => Promise<void>;
@@ -59,12 +64,17 @@ function CampaignCanvasInner({
   onNodeSelect,
   onEdgeSelect,
   onConnect,
+  onAddNodeRequest,
   onNodeDragStop,
   onNodesDelete,
   onEdgesDelete
 }: CampaignCanvasProps) {
   const { t } = useI18n();
-  const initialNodes = useMemo(() => toFlowNodes(nodes, mode, t), [mode, nodes, t]);
+  const { screenToFlowPosition } = useReactFlow();
+  const initialNodes = useMemo(
+    () => toFlowNodes(nodes, mode, t, onAddNodeRequest),
+    [mode, nodes, onAddNodeRequest, t]
+  );
   const initialEdges = useMemo(() => toFlowEdges(edges), [edges]);
   const [flowNodes, setNodes, handleNodesChange] =
     useNodesState<CampaignFlowNode>(initialNodes);
@@ -143,16 +153,38 @@ function CampaignCanvasInner({
           onNodeSelect(node.id);
           onEdgeSelect(null);
         }}
+        onNodeDoubleClick={(_event, node) => {
+          if (mode === "builder") {
+            onAddNodeRequest({ sourceNodeId: node.id });
+          }
+        }}
         onNodeDragStop={handleNodeDragStop}
         onNodesChange={handleNodesChange}
         onNodesDelete={handleNodesDelete}
-        onPaneClick={() => {
+        onPaneClick={(event) => {
+          if (mode === "builder" && event.detail >= 2) {
+            onAddNodeRequest({
+              viewportPosition: screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY
+              })
+            });
+            return;
+          }
           onNodeSelect(null);
           onEdgeSelect(null);
         }}
         onEdgeClick={(_event, edge) => {
           onEdgeSelect(edge.id);
           onNodeSelect(null);
+        }}
+        onEdgeDoubleClick={(_event, edge) => {
+          if (mode === "builder") {
+            onAddNodeRequest({
+              sourceEdgeId: edge.id,
+              sourceNodeId: edge.source
+            });
+          }
         }}
         panOnScroll
         proOptions={{ hideAttribution: true }}

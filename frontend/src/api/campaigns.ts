@@ -65,6 +65,8 @@ type RawCampaignMapNode = {
   map_x: number;
   map_y: number;
   reward_xp: number;
+  reward_skill_id?: number | null;
+  reward_skill?: { id: number; name: string } | null;
   target_value: number;
   target_unit: string;
   difficulty: string;
@@ -204,6 +206,9 @@ function transformMapNode(raw: RawCampaignMapNode): CampaignMapNode {
     x,
     y,
     rewardXp: raw.reward_xp,
+    rewardSkill: raw.reward_skill
+      ? { id: String(raw.reward_skill.id), name: raw.reward_skill.name }
+      : null,
     targetValue: raw.target_value,
     targetUnit: raw.target_unit,
     difficulty: raw.difficulty

@@ -12,9 +12,12 @@ Zrodlem prawdy dla ogolnych decyzji produktowych pozostaje `docs/phase-2-rpg-mec
 
 ## Aktualny stan repo
 
-Kod aplikacji jest jeszcze przed modulem 0.
+Ten dokument zaczynal jako plan wdrozenia modulow RPG. Repo nie jest juz przed
+modulem 0. Starsze analizy w `docs/analysis/` moga opisywac stan sprzed
+implementacji i trzeba je traktowac jako historyczne, jezeli nie zgadzaja sie z
+aktualnym kodem.
 
-Istnieje Phase 1:
+Istnieje lokalne MVP:
 
 - `skills`,
 - `activities`,
@@ -23,14 +26,34 @@ Istnieje Phase 1:
 - React shell,
 - dashboard oparty o aktywnosci i statusy.
 
-Nie istnieja jeszcze:
+Istnieja tez moduly post-MVP:
 
 - aplikacja Django `rpg`,
-- modele questow, habitow, challenge, achievementow i journala,
-- endpointy `/api/quests/...`,
-- endpointy `/api/habits/...`.
+- questy, nagrody questow, completion i progress,
+- habity, check-iny, streaki, milestone i milestone XP,
+- goals, progress goals, challenges, challenge rewards i check-iny,
+- achievementy i achievement unlocks,
+- journal z wpisami manualnymi oraz systemowymi,
+- character identity,
+- campaign/campaign studio backend i React Flow UI,
+- `planner` z kalendarzem,
+- endpointy `/api/quests/...`, `/api/habits/...`, `/api/goals/...`,
+  `/api/challenges/...`, `/api/achievements/...`, `/api/journal/...`,
+  `/api/campaigns/...` i `/api/calendar/events/...`.
 
-Obecne sekcje RPG w dashboardzie sa przejsciowa warstwa UI/API i beda przepinane na realne dane dopiero od modulow 0-4.
+Dashboard API korzysta juz z realnych danych dla questow, habitow, journala,
+active challenge i ostatnich achievementow. React ma osobne widoki sidebar dla
+dashboardu, goals, achievements, journala, kalendarza, ustawien i campaign.
+
+Aktualny blocker operacyjny: lokalny PostgreSQL nie odpowiada na
+`127.0.0.1:5432`, wiec pelny backendowy test suite nie zostal potwierdzony w
+ostatnim sprawdzeniu. Szczegoly sa w `docs/current-project-status.md`.
+
+Zakres, ktory nadal nie jest zaimplementowany z glownego MVP roadmap:
+
+- ActivityWatch importer,
+- pola importera na `ActivityEntry`: `external_id`, `external_source`,
+  `imported_at`.
 
 ## Kontrakt API i nazewnictwo
 
@@ -49,7 +72,11 @@ Decyzje kontraktowe po analizie:
 
 ## Kolejnosc wdrozenia
 
-Moduly 0-2 sa opisane osobno, bo maja rozne odpowiedzialnosci, ale rekomendacja implementacyjna jest taka, zeby wdrozyc je jako pierwszy backendowy pakiet. Dopiero po nim warto przepinac dashboard API i Reacta, bo bez realnych modeli frontend musialby dalej symulowac stan.
+Ponizsza kolejnosc zostaje jako historyczny plan i kontrakt projektowy. Wedlug
+aktualnego kodu moduly 0-7 sa zaimplementowane albo maja dzialajace podstawowe
+powierzchnie, ale wymagaja ponownej weryfikacji po przywroceniu PostgreSQL.
+Najblizszy praktyczny etap to modul 8, czyli stabilizacja, testy i czyszczenie
+stalej dokumentacji.
 
 ### 1. Modul 0 - fundament `rpg`
 

@@ -483,6 +483,8 @@ Etap 1 jest gotowy, gdy:
 | Phase 1 - Local MVP foundation | Implemented for local development | 2026-06-10 | Models, PostgreSQL `.env` settings, migrations, admin, seed command, dashboard aggregation services, JSON API endpoints, manual activity endpoint, CSRF endpoint, and tests are in place. Backend tests passed against PostgreSQL. |
 | Phase 1 - React dashboard | Implemented for Vite development mode | 2026-06-10 | React + TypeScript + Vite + Tailwind CSS frontend is scaffolded. Dashboard UI consumes the backend API, supports time ranges, manual activity submission, local mock fallback, and frontend typecheck/build passed. |
 | Phase 1 - Dashboard themes | Implemented in React | 2026-06-10 | The 5 dashboard themes are implemented in React with local browser persistence. Theme switching updates the dashboard UI without backend changes. |
+| Phase 1 - Django React shell | Implemented | 2026-06-29 | `dashboard.views.react_shell` serves `frontend/dist/index.html` when a production frontend build exists. Vite remains the development frontend path. |
+| Current local verification | Blocked by local PostgreSQL runtime | 2026-06-29 | `.venv/bin/python manage.py check`, frontend typecheck, and frontend build pass. Full backend tests are currently blocked because local PostgreSQL at `127.0.0.1:5432` is not responding. See `docs/current-project-status.md`. |
 
 ### Phase 1 - Detailed Progress
 
@@ -504,5 +506,7 @@ Etap 1 jest gotowy, gdy:
 - [x] Move dashboard UI and theme switching into React.
 - [x] Verify frontend typecheck and production build.
 - [x] Verify backend checks and tests.
-- [ ] Serve the production React build through Django.
-- [ ] Persist quest and habit click state in the database as part of the next RPG mechanics stages.
+- [x] Serve the production React build through Django.
+- [x] Persist quest and habit click state in the database as part of the next RPG mechanics stages.
+- [ ] Restore local PostgreSQL availability and rerun the full backend test suite.
+- [ ] Implement ActivityWatch importer as stage 2 work.
